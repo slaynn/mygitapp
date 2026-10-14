@@ -1,0 +1,387 @@
+{
+ "data": {
+  "repository": {
+   "pullRequest": {
+    "id": "PR_1",
+    "number": 42,
+    "title": "fix: restore toggle",
+    "url": "https://github.com/acme/app/pull/42",
+    "state": "OPEN",
+    "isDraft": false,
+    "createdAt": "2026-10-10T10:00:00Z",
+    "updatedAt": "2026-10-12T10:00:00Z",
+    "author": {
+     "login": "slaynn",
+     "avatarUrl": "https://avatars.githubusercontent.com/u/1?v=4"
+    },
+    "repository": {
+     "nameWithOwner": "acme/app",
+     "mergeCommitAllowed": true,
+     "squashMergeAllowed": true,
+     "rebaseMergeAllowed": false
+    },
+    "headRefName": "fix/toggle",
+    "baseRefName": "main",
+    "additions": 12,
+    "deletions": 3,
+    "reviewDecision": "APPROVED",
+    "comments": {
+     "totalCount": 1
+    },
+    "commits": {
+     "nodes": [
+      {
+       "commit": {
+        "statusCheckRollup": {
+         "state": "FAILURE"
+        }
+       }
+      }
+     ]
+    },
+    "body": "Fixes the toggle.",
+    "headRefOid": "abc",
+    "changedFiles": 2,
+    "mergeable": "MERGEABLE",
+    "mergeStateStatus": "UNSTABLE",
+    "viewerDidAuthor": true,
+    "viewerCanUpdate": true,
+    "merged": false,
+    "reviewRequests": {
+     "nodes": [
+      {
+       "requestedReviewer": {
+        "__typename": "Team",
+        "name": "core"
+       }
+      }
+     ]
+    },
+    "reviews": {
+     "nodes": [
+      {
+       "id": "R_codex",
+       "author": {
+        "login": "chatgpt-codex-connector",
+        "avatarUrl": "https://avatars.githubusercontent.com/in/1144995?v=4"
+       },
+       "state": "COMMENTED",
+       "body": "\n### 💡 Codex Review\n\nHere are some automated review suggestions.\n\n<details> <summary>ℹ️ About Codex in GitHub</summary>\n<br/>\n\nBoilerplate text.\n</details>",
+       "submittedAt": "2026-10-10T10:05:00Z",
+       "createdAt": "2026-10-10T10:04:00Z",
+       "url": "https://github.com/acme/app/pull/42#pullrequestreview-1"
+      },
+      {
+       "id": "R_reply",
+       "author": {
+        "login": "slaynn",
+        "avatarUrl": "https://avatars.githubusercontent.com/u/1?v=4"
+       },
+       "state": "COMMENTED",
+       "body": "",
+       "submittedAt": "2026-10-11T09:00:00Z",
+       "createdAt": "2026-10-11T09:00:00Z",
+       "url": "https://github.com/acme/app/pull/42#pullrequestreview-2"
+      },
+      {
+       "id": "R_pending",
+       "author": {
+        "login": "slaynn",
+        "avatarUrl": "https://avatars.githubusercontent.com/u/1?v=4"
+       },
+       "state": "PENDING",
+       "body": "draft",
+       "submittedAt": null,
+       "createdAt": "2026-10-11T09:30:00Z",
+       "url": "https://github.com/acme/app/pull/42#pullrequestreview-3"
+      },
+      {
+       "id": "R_approve",
+       "author": {
+        "login": "alice",
+        "avatarUrl": "https://avatars.githubusercontent.com/u/2?v=4"
+       },
+       "state": "APPROVED",
+       "body": "",
+       "submittedAt": "2026-10-12T09:00:00Z",
+       "createdAt": "2026-10-12T09:00:00Z",
+       "url": "https://github.com/acme/app/pull/42#pullrequestreview-4"
+      }
+     ]
+    },
+    "reviewThreads": {
+     "nodes": [
+      {
+       "id": "T_1",
+       "isResolved": true,
+       "isOutdated": false,
+       "path": "src/panel.tsx",
+       "line": 12,
+       "originalLine": 12,
+       "startLine": 11,
+       "originalStartLine": 11,
+       "diffSide": "RIGHT",
+       "viewerCanResolve": false,
+       "viewerCanUnresolve": true,
+       "viewerCanReply": true,
+       "resolvedBy": {
+        "login": "slaynn",
+        "avatarUrl": "https://avatars.githubusercontent.com/u/1?v=4"
+       },
+       "comments": {
+        "nodes": [
+         {
+          "id": "C_1",
+          "author": {
+           "login": "chatgpt-codex-connector",
+           "avatarUrl": "https://avatars.githubusercontent.com/in/1144995?v=4"
+          },
+          "body": "**<sub><sub>![P1 Badge](https://img.shields.io/badge/P1-orange?style=flat)</sub></sub>  Block archiving until the toggle update completes**\n\nThe toggle is visible before the request finishes.\n\nUseful? React with 👍 / 👎.",
+          "createdAt": "2026-10-10T10:05:00Z",
+          "url": "https://github.com/acme/app/pull/42#discussion_r1",
+          "diffHunk": "@@ -10,6 +10,8 @@ export function Panel() {\n   const a = 1;\n   const b = 2;\n-  if (!isArchived && !isDone) {\n+  if (!isArchived) {\n+    showToggle();\n   }\n   return a;",
+          "outdated": false,
+          "pullRequestReview": {
+           "id": "R_codex"
+          }
+         },
+         {
+          "id": "C_2",
+          "author": {
+           "login": "slaynn",
+           "avatarUrl": "https://avatars.githubusercontent.com/u/1?v=4"
+          },
+          "body": "Fixed in 2c3d4e5.",
+          "createdAt": "2026-10-11T09:00:00Z",
+          "url": "https://github.com/acme/app/pull/42#discussion_r2",
+          "diffHunk": "@@ -10,6 +10,8 @@ export function Panel() {\n   const a = 1;\n   const b = 2;\n-  if (!isArchived && !isDone) {\n+  if (!isArchived) {\n+    showToggle();\n   }\n   return a;",
+          "outdated": false,
+          "pullRequestReview": {
+           "id": "R_reply"
+          }
+         }
+        ]
+       }
+      },
+      {
+       "id": "T_2",
+       "isResolved": false,
+       "isOutdated": false,
+       "path": "src/index.ts",
+       "line": 2,
+       "originalLine": 2,
+       "startLine": null,
+       "originalStartLine": null,
+       "diffSide": "RIGHT",
+       "viewerCanResolve": true,
+       "viewerCanUnresolve": false,
+       "viewerCanReply": true,
+       "resolvedBy": null,
+       "comments": {
+        "nodes": [
+         {
+          "id": "C_3",
+          "author": {
+           "login": "chatgpt-codex-connector",
+           "avatarUrl": "https://avatars.githubusercontent.com/in/1144995?v=4"
+          },
+          "body": "**<sub><sub>![P2 Badge](https://img.shields.io/badge/P2-yellow?style=flat)</sub></sub>  Unused import**\n\n`y` is never used.",
+          "createdAt": "2026-10-10T10:05:00Z",
+          "url": "https://github.com/acme/app/pull/42#discussion_r3",
+          "diffHunk": "@@ -1,3 +1,4 @@\n import x from 'x';\n+import y from 'y';\n export default x;",
+          "outdated": false,
+          "pullRequestReview": {
+           "id": "R_codex"
+          }
+         }
+        ]
+       }
+      },
+      {
+       "id": "T_3",
+       "isResolved": false,
+       "isOutdated": true,
+       "path": "src/panel.tsx",
+       "line": null,
+       "originalLine": 4,
+       "startLine": null,
+       "originalStartLine": null,
+       "diffSide": "RIGHT",
+       "viewerCanResolve": true,
+       "viewerCanUnresolve": false,
+       "viewerCanReply": true,
+       "resolvedBy": null,
+       "comments": {
+        "nodes": [
+         {
+          "id": "C_4",
+          "author": {
+           "login": "alice",
+           "avatarUrl": "https://avatars.githubusercontent.com/u/2?v=4"
+          },
+          "body": "Nit: naming.",
+          "createdAt": "2026-10-12T09:00:00Z",
+          "url": "https://github.com/acme/app/pull/42#discussion_r4",
+          "diffHunk": "@@ -1,3 +1,4 @@\n import x from 'x';\n+import y from 'y';\n export default x;",
+          "outdated": true,
+          "pullRequestReview": {
+           "id": "R_approve"
+          }
+         }
+        ]
+       }
+      }
+     ]
+    },
+    "timelineItems": {
+     "nodes": [
+      {
+       "__typename": "PullRequestCommit",
+       "id": "PRC_1",
+       "commit": {
+        "oid": "1a2b3c41a2b3c41a2b3c41a2b3c41a2b3c4",
+        "abbreviatedOid": "1a2b3c4",
+        "messageHeadline": "fix: toggle",
+        "committedDate": "2026-10-10T09:50:00Z",
+        "url": "https://github.com/acme/app/commit/1a2b3c4",
+        "author": {
+         "name": "Slaynn",
+         "avatarUrl": null,
+         "user": {
+          "login": "slaynn"
+         }
+        },
+        "statusCheckRollup": {
+         "state": "SUCCESS"
+        }
+       }
+      },
+      {
+       "__typename": "PullRequestCommit",
+       "id": "PRC_2",
+       "commit": {
+        "oid": "1b2c3d41b2c3d41b2c3d41b2c3d41b2c3d4",
+        "abbreviatedOid": "1b2c3d4",
+        "messageHeadline": "test: toggle",
+        "committedDate": "2026-10-10T09:55:00Z",
+        "url": "https://github.com/acme/app/commit/1b2c3d4",
+        "author": {
+         "name": "Slaynn",
+         "avatarUrl": null,
+         "user": {
+          "login": "slaynn"
+         }
+        },
+        "statusCheckRollup": {
+         "state": "SUCCESS"
+        }
+       }
+      },
+      {
+       "__typename": "HeadRefForcePushedEvent",
+       "id": "FP_1",
+       "createdAt": "2026-10-11T08:00:00Z",
+       "actor": {
+        "login": "slaynn",
+        "avatarUrl": "https://avatars.githubusercontent.com/u/1?v=4"
+       },
+       "beforeCommit": {
+        "abbreviatedOid": "1b2c3d4"
+       },
+       "afterCommit": {
+        "abbreviatedOid": "2c3d4e5"
+       }
+      },
+      {
+       "__typename": "PullRequestCommit",
+       "id": "PRC_3",
+       "commit": {
+        "oid": "2c3d4e52c3d4e52c3d4e52c3d4e52c3d4e5",
+        "abbreviatedOid": "2c3d4e5",
+        "messageHeadline": "fix: wait for toggle",
+        "committedDate": "2026-10-11T08:30:00Z",
+        "url": "https://github.com/acme/app/commit/2c3d4e5",
+        "author": {
+         "name": "Slaynn",
+         "avatarUrl": null,
+         "user": {
+          "login": "slaynn"
+         }
+        },
+        "statusCheckRollup": {
+         "state": "FAILURE"
+        }
+       }
+      },
+      {
+       "__typename": "IssueComment",
+       "id": "IC_1",
+       "author": {
+        "login": "alice",
+        "avatarUrl": "https://avatars.githubusercontent.com/u/2?v=4"
+       },
+       "body": "LGTM once CI is green",
+       "createdAt": "2026-10-11T12:00:00Z",
+       "url": "https://github.com/acme/app/pull/42#issuecomment-1"
+      },
+      {
+       "__typename": "LabeledEvent"
+      }
+     ]
+    },
+    "lastCommit": {
+     "nodes": [
+      {
+       "commit": {
+        "oid": "2c3d4e5",
+        "statusCheckRollup": {
+         "state": "FAILURE",
+         "contexts": {
+          "nodes": [
+           {
+            "__typename": "CheckRun",
+            "name": "test",
+            "status": "COMPLETED",
+            "conclusion": "FAILURE",
+            "detailsUrl": "https://github.com/acme/app/actions/runs/1/job/1",
+            "startedAt": "2026-10-11T08:31:00Z",
+            "completedAt": "2026-10-11T08:33:10Z",
+            "checkSuite": {
+             "workflowRun": {
+              "workflow": {
+               "name": "CI"
+              }
+             }
+            }
+           },
+           {
+            "__typename": "CheckRun",
+            "name": "lint",
+            "status": "IN_PROGRESS",
+            "conclusion": null,
+            "detailsUrl": null,
+            "startedAt": "2026-10-11T08:31:00Z",
+            "completedAt": null,
+            "checkSuite": {
+             "workflowRun": null
+            }
+           },
+           {
+            "__typename": "StatusContext",
+            "context": "vercel",
+            "state": "SUCCESS",
+            "description": "Deployed",
+            "targetUrl": "https://vercel.com/x",
+            "createdAt": "2026-10-11T08:35:00Z"
+           }
+          ]
+         }
+        }
+       }
+      }
+     ]
+    }
+   }
+  }
+ }
+}
