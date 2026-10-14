@@ -51,8 +51,9 @@ enum MarkdownPreprocessor {
         return removeReactionPrompt(text).trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
+    /// Codex ends comments with "Useful? React with 👍 / 👎." (with non-breaking spaces).
     private static func removeReactionPrompt(_ text: String) -> String {
-        text.replacingOccurrences(of: #"\n?Useful\? React with 👍 / 👎\.?"#, with: "", options: .regularExpression)
+        text.replacingOccurrences(of: #"\n?Useful\? React with[^\n]*"#, with: "", options: .regularExpression)
     }
 
     /// Inline HTML → markdown equivalents. `<details>`/`<summary>` are kept for `segments`.

@@ -17,17 +17,24 @@ struct PRDetailView: View {
     }
 
     var body: some View {
+        // The list's summary draws the header right away; the detail fills in the rest.
+        let summary = model.detail.value?.summary ?? app.knownSummaries[model.ref.id]
+        let extra = model.detail.value?.extra
         VStack(spacing: 0) {
-            if let pr = model.detail.value {
-                header(pr)
+            if let summary {
+                header(summary, extra: extra)
                 Divider()
-                tabBar(pr)
+                tabBar(summary, extra: extra)
                 Divider()
                 ScrollView {
                     VStack(alignment: .leading, spacing: 14) {
                         if let error = model.actionError { ErrorBanner(message: error) }
                         if let error = model.detail.error { ErrorBanner(message: error) }
-                        content(pr)
+                        if let pr = model.detail.value {
+                            content(pr)
+                        } else if model.detail.error == nil {
+                            ProgressView().frame(maxWidth: .infinity).padding(.top, 60)
+                        }
                     }
                     .padding(20)
                     .frame(maxWidth: 1100, alignment: .leading)
@@ -65,15 +72,14 @@ struct PRDetailView: View {
 
     // MARK: Header
 
-    private func header(_ pr: PRDetail) -> some View {
-        let s = pr.summary
-        return VStack(alignment: .leading, spacing: 10) {
+    private func header(_ s: PRSummary, extra: PRDetailExtra?) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
             HStack(alignment: .firstTextBaseline, spacing: 10) {
                 PRStateIcon(state: s.state, isDraft: s.isDraft).font(.system(size: 17))
                 Text(s.title).font(.system(size: 19, weight: .semibold)).textSelection(.enabled)
                 Text("#\(s.number)").font(.system(size: 19)).foregroundStyle(.secondary)
                 Spacer()
-                actions(pr)
+                actions(s, extra: extra)
             }
             HStack(spacing: 8) {
                 stateBadge(s)
@@ -102,16 +108,16 @@ struct PRDetailView: View {
         }
     }
 
-    @ViewBuilder private func actions(_ pr: PRDetail) -> some View {
-        let s = pr.summary
+    /// Approve / merge need the detail (authorship, allowed merge methods), so they appear once it loads.
+    @ViewBuilder private func actions(_ s: PRSummary, extra: PRDetailExtra?) -> some View {
         HStack(spacing: 8) {
             if model.busy.contains("approve") || model.busy.contains("merge") { ProgressView().controlSize(.small) }
-            if s.state == "OPEN" && !pr.extra.viewerDidAuthor {
+            if let extra, s.state == "OPEN" && !extra.viewerDidAuthor {
                 Button { confirmApprove = true } label: { Label("Approuver", systemImage: "checkmark") }
             }
-            if s.state == "OPEN" && !s.isDraft {
+            if let extra, s.state == "OPEN" && !s.isDraft {
                 Menu {
-                    let repo = pr.extra.repository
+                    let repo = extra.repository
                     if repo.squashMergeAllowed ?? true { Button(mergeLabel("SQUASH")) { pendingMerge = "SQUASH" } }
                     if repo.mergeCommitAllowed ?? true { Button(mergeLabel("MERGE")) { pendingMerge = "MERGE" } }
                     if repo.rebaseMergeAllowed ?? true { Button(mergeLabel("REBASE")) { pendingMerge = "REBASE" } }
@@ -120,12 +126,11 @@ struct PRDetailView: View {
                 }
                 .menuStyle(.borderedButton)
                 .fixedSize()
-                .help(mergeHelp(pr))
+                .help(mergeHelp(extra))
             }
             Link(destination: s.url) { Label("GitHub", systemImage: "arrow.up.right") }
                 .buttonStyle(.bordered)
         }
-        .controlSize(.small)
     }
 
     private func mergeLabel(_ method: String) -> String {
@@ -136,34 +141,33 @@ struct PRDetailView: View {
         }
     }
 
-    private func mergeHelp(_ pr: PRDetail) -> String {
-        switch pr.extra.mergeStateStatus {
+    private func mergeHelp(_ extra: PRDetailExtra) -> String {
+        switch extra.mergeStateStatus {
         case "CLEAN": "Prête à merger"
         case "BLOCKED": "Bloquée par les règles de protection de branche"
         case "BEHIND": "La branche est en retard sur la base"
         case "DIRTY": "Conflits à résoudre"
         case "UNSTABLE": "Checks en échec ou en cours"
-        default: pr.extra.mergeStateStatus.lowercased()
+        default: extra.mergeStateStatus.lowercased()
         }
     }
 
     // MARK: Tabs
 
-    private func tabBar(_ pr: PRDetail) -> some View {
-        let threads = pr.extra.reviewThreads.nodes
-        let unresolved = threads.filter { !$0.isResolved }.count
-        let checks = pr.extra.checks
-        let failing = checks.filter { $0.status == .failure }.count
+    private func tabBar(_ s: PRSummary, extra: PRDetailExtra?) -> some View {
+        let unresolved = extra.map { $0.reviewThreads.nodes.filter { !$0.isResolved }.count } ?? s.unresolvedCount
+        let checks = extra?.checks
+        let failing = checks?.filter { $0.status == .failure }.count ?? 0
         return HStack(spacing: 2) {
             tabButton("Conversation", .conversation, count: nil)
             tabButton("Threads", .threads, count: unresolved, highlight: unresolved > 0)
-            tabButton("Files", .files, count: pr.extra.changedFiles)
-            tabButton("Checks", .checks, count: failing > 0 ? failing : checks.count, highlight: failing > 0, highlightColor: Theme.red)
+            tabButton("Files", .files, count: extra?.changedFiles)
+            tabButton("Checks", .checks, count: checks.map { failing > 0 ? failing : $0.count },
+                      highlight: failing > 0, highlightColor: Theme.red)
             Spacer()
             if tab == .conversation || tab == .threads {
                 Toggle("Masquer les résolus", isOn: $hideResolved)
                     .toggleStyle(.checkbox)
-                    .font(.system(size: 12))
             }
             if model.detail.isLoading { ProgressView().controlSize(.small).padding(.leading, 8) }
         }
@@ -172,27 +176,7 @@ struct PRDetailView: View {
     }
 
     private func tabButton(_ title: String, _ value: Tab, count: Int?, highlight: Bool = false, highlightColor: Color = Theme.orange) -> some View {
-        Button {
-            tab = value
-        } label: {
-            HStack(spacing: 5) {
-                Text(title)
-                if let count {
-                    Text("\(count)")
-                        .font(.system(size: 10.5, weight: .medium))
-                        .padding(.horizontal, 5)
-                        .padding(.vertical, 1)
-                        .background((highlight ? highlightColor : Color.white).opacity(highlight ? 0.2 : 0.08), in: Capsule())
-                        .foregroundStyle(highlight ? highlightColor : .secondary)
-                }
-            }
-            .font(.system(size: 12.5))
-            .padding(.horizontal, 10)
-            .padding(.vertical, 5)
-            .background(tab == value ? Color.white.opacity(0.08) : .clear, in: RoundedRectangle(cornerRadius: 6))
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
+        TabPill(title: title, count: count, isSelected: tab == value, highlight: highlight ? highlightColor : nil) { tab = value }
     }
 
     @ViewBuilder private func content(_ pr: PRDetail) -> some View {

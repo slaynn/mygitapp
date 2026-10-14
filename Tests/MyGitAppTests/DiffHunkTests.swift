@@ -97,6 +97,9 @@ import Testing
 
     @Test func dropsReactionPromptFromDisplay() {
         #expect(!MarkdownPreprocessor.clean(codex).contains("Useful?"))
+        // Exact bytes sent by Codex: a non-breaking space after 👍.
+        let real = "Fix it.\n\nUseful? React with 👍\u{00A0}/ 👎.\n"
+        #expect(MarkdownPreprocessor.clean(real).trimmingCharacters(in: .whitespacesAndNewlines) == "Fix it.")
     }
 
     @Test func extractsPriority() {

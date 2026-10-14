@@ -232,6 +232,37 @@ struct HoverRow<Content: View>: View {
     }
 }
 
+/// Tab used by the repo and PR screens; sized like a regular macOS control.
+struct TabPill: View {
+    var title: String
+    var count: Int?
+    var isSelected: Bool
+    var highlight: Color?
+    var action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 6) {
+                Text(title)
+                if let count {
+                    Text("\(count)")
+                        .font(.system(size: 11, weight: .medium))
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 1)
+                        .background((highlight ?? .white).opacity(highlight == nil ? 0.08 : 0.2), in: Capsule())
+                        .foregroundStyle(highlight ?? .secondary)
+                }
+            }
+            .font(.system(size: 13, weight: isSelected ? .medium : .regular))
+            .padding(.horizontal, 11)
+            .frame(height: 28)
+            .background(isSelected ? Color.white.opacity(0.09) : .clear, in: RoundedRectangle(cornerRadius: 7))
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+    }
+}
+
 // MARK: - Markdown
 
 struct MarkdownBody: View {

@@ -37,6 +37,8 @@ final class AppState {
     var myPRs: [PRSummary] = []
     var notifications: [GHNotification] = []
     var repoSummaries: [String: RepoSummary] = [:]
+    /// Summaries seen in any list, so a PR screen can draw its header before its detail arrives.
+    private(set) var knownSummaries: [String: PRSummary] = [:]
     var sidebarError: String?
 
     /// When false, global lists only show repos pinned in the sidebar.
@@ -54,6 +56,7 @@ final class AppState {
         notifications = DiskCache.shared.read("global-notifications") ?? []
         repoSummaries = DiskCache.shared.read("global-repo-summaries") ?? [:]
         viewer = DiskCache.shared.read("viewer")
+        remember(reviewRequests + myPRs)
 
         let ghToken = await Task.detached { Auth.tokenFromGH() }.value
         if let ghToken, await signIn(with: ghToken) { return }
@@ -105,6 +108,7 @@ final class AppState {
         catch { errors.append(error.localizedDescription) }
         do { repoSummaries = try await sums; DiskCache.shared.write(repoSummaries, key: "global-repo-summaries") }
         catch { errors.append(error.localizedDescription) }
+        remember(reviewRequests + myPRs)
         sidebarError = errors.first
         if errors.isEmpty { SyncClock.shared.markSynced() }
     }
@@ -124,6 +128,10 @@ final class AppState {
     }
 
     func summary(for nameWithOwner: String) -> RepoSummary? { repoSummaries[nameWithOwner.lowercased()] }
+
+    func remember(_ prs: [PRSummary]) {
+        for pr in prs where knownSummaries[pr.ref.id] != pr { knownSummaries[pr.ref.id] = pr }
+    }
 
     // MARK: Navigation
 

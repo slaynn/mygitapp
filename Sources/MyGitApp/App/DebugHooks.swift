@@ -11,7 +11,7 @@ enum DebugHooks {
     @MainActor
     static func run(_ app: AppState) async {
         guard let output = env["MYGITAPP_SNAPSHOT"] else { return }
-        if let target = env["MYGITAPP_OPEN"] {
+        if let target = env["MYGITAPP_OPEN"], !target.isEmpty {
             switch target {
             case "inbox": app.selection = .inbox
             case "reviews": app.selection = .reviewRequests

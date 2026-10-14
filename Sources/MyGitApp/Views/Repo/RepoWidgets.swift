@@ -58,7 +58,6 @@ struct RepoHeader: View {
                 .menuStyle(.borderedButton)
                 .fixedSize()
             }
-            .controlSize(.small)
         }
     }
 }
@@ -314,7 +313,6 @@ struct AboutPanel: View {
                     }
                     Menu("Ouvrir…") { LocalOpenButtons(path: localPath) }
                         .menuStyle(.borderedButton)
-                        .controlSize(.small)
                         .fixedSize()
                 }
             }

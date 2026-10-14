@@ -73,7 +73,7 @@ struct ReviewThreadView: View {
                     if resolving { expanded = false }
                     Task { await model.setResolved(thread, resolving, app: app) }
                 }
-                .controlSize(.small)
+                .buttonStyle(.bordered)
             }
         }
         .padding(.horizontal, 12)

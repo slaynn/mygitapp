@@ -37,6 +37,7 @@ struct RepoView: View {
         }
         .background(Theme.background)
         .navigationTitle(nameWithOwner)
+        .prefetching(overview.value?.pullRequests.nodes ?? [])
         .task(id: LoadKey(name: nameWithOwner, tick: app.refreshTick)) {
             guard let client = app.client else { return }
             await overview.load("repo-\(nameWithOwner)") { try await client.repoOverview(nameWithOwner) }
@@ -71,26 +72,13 @@ struct RepoView: View {
                 Label("Open on GitHub", systemImage: "arrow.up.right")
             }
             .buttonStyle(.bordered)
-            .controlSize(.small)
         }
         .padding(.horizontal, 20)
         .padding(.vertical, 10)
     }
 
     private func tabButton(_ title: String, _ value: Tab, count: Int? = nil) -> some View {
-        Button {
-            tab = value
-        } label: {
-            HStack(spacing: 4) {
-                Text(title)
-                if let count, count > 0 { Text("\(count)").foregroundStyle(.secondary) }
-            }
-            .font(.system(size: 12))
-            .padding(.horizontal, 9)
-            .padding(.vertical, 4)
-            .background(tab == value ? Color.white.opacity(0.08) : .clear, in: RoundedRectangle(cornerRadius: 6))
-        }
-        .buttonStyle(.plain)
+        TabPill(title: title, count: count.flatMap { $0 > 0 ? $0 : nil }, isSelected: tab == value, highlight: nil) { tab = value }
     }
 
     // MARK: Overview

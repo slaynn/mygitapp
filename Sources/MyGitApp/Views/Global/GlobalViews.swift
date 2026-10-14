@@ -70,6 +70,7 @@ struct PRList: View {
             }
         }
         .card()
+        .prefetching(shown)
     }
 }
 
@@ -150,7 +151,6 @@ struct InboxView: View {
                         }
                         ScopeToggle()
                     }
-                    .controlSize(.small)
                 }
                 NotificationList(notifications: items, empty: "Rien de neuf.")
                     .padding(.horizontal, 24)

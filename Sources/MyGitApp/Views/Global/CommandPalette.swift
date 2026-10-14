@@ -78,7 +78,7 @@ struct CommandPalette: View {
             Item(id: "mine", title: "Mes pull requests", subtitle: "PRs ouvertes par toi", symbol: "arrow.triangle.pull") { app.selection = .pullRequests },
             Item(id: "manage", title: "Gérer les repos…", subtitle: "Épingler / retirer", symbol: "plus.circle") { app.isManageReposOpen = true },
         ]
-        all += app.store.pinned.map { repo in
+        all += app.store.ordered.map { repo in
             Item(id: "repo-" + repo.nameWithOwner, title: repo.nameWithOwner, subtitle: repo.localPath ?? "Repo épinglé", symbol: "folder") {
                 app.selection = .repo(repo.nameWithOwner)
             }

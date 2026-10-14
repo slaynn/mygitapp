@@ -21,7 +21,7 @@ struct ThreadsTab: View {
                     CopyButton(label: "Copier les non résolus pour l'agent", systemImage: "sparkles") {
                         ReviewTimeline.agentPrompt(for: unresolved, pr: model.ref)
                     }
-                    .controlSize(.small)
+                    .buttonStyle(.bordered)
                 }
             }
             if all.isEmpty {

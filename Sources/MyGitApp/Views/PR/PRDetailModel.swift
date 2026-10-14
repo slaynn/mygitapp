@@ -17,7 +17,7 @@ final class PRDetailModel {
 
     func reload(_ app: AppState) async {
         guard let client = app.client else { return }
-        await detail.load("pr-\(ref.id)") { [ref] in try await client.pullRequest(ref) }
+        await detail.load(ref.detailCacheKey) { [ref] in try await client.pullRequest(ref) }
     }
 
     func loadFiles(_ app: AppState) async {

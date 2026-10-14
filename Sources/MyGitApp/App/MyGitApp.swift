@@ -49,7 +49,7 @@ struct AppCommands: Commands {
             Button("Retour") { if !app.path.isEmpty { app.path.removeLast() } }
                 .keyboardShortcut("[")
             Divider()
-            ForEach(Array(app.store.pinned.prefix(9).enumerated()), id: \.element.id) { index, repo in
+            ForEach(Array(app.store.ordered.prefix(9).enumerated()), id: \.element.id) { index, repo in
                 Button(repo.nameWithOwner) { app.selection = .repo(repo.nameWithOwner) }
                     .keyboardShortcut(KeyEquivalent(Character("\(index + 1)")))
             }

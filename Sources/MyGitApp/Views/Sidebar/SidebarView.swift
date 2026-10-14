@@ -3,6 +3,8 @@ import SwiftUI
 
 struct SidebarView: View {
     @Environment(AppState.self) private var app
+    /// Lowercased owners whose section is collapsed, comma-separated.
+    @AppStorage("collapsedWorkspaces") private var collapsedRaw = ""
 
     var body: some View {
         @Bindable var app = app
@@ -20,24 +22,25 @@ struct SidebarView: View {
                     .tag(SidebarItem.reviewRequests)
             }
 
-            Section {
-                ForEach(app.store.pinned) { repo in
-                    PinnedRepoRow(repo: repo, summary: app.summary(for: repo.nameWithOwner))
-                        .tag(SidebarItem.repo(repo.nameWithOwner))
-                        .contextMenu { contextMenu(for: repo) }
-                }
-                .onMove { app.store.move(from: $0, to: $1) }
-                if app.store.pinned.isEmpty {
+            if app.store.pinned.isEmpty {
+                Section("Repos") {
                     Button("Ajouter des repos…") { app.isManageReposOpen = true }
                         .buttonStyle(.link)
                 }
-            } header: {
-                HStack {
-                    Text("Pinned")
-                    Spacer()
-                    Button { app.isManageReposOpen = true } label: { Image(systemName: "plus") }
-                        .buttonStyle(.plain)
-                        .help("Gérer les repos (⇧⌘P)")
+            }
+
+            ForEach(app.store.groups) { group in
+                Section(isExpanded: expandedBinding(group)) {
+                    ForEach(group.repos) { repo in
+                        PinnedRepoRow(repo: repo, summary: app.summary(for: repo.nameWithOwner))
+                            .tag(SidebarItem.repo(repo.nameWithOwner))
+                            .contextMenu { contextMenu(for: repo) }
+                    }
+                    .onMove { app.store.move(in: group, from: $0, to: $1) }
+                } header: {
+                    WorkspaceHeader(group: group,
+                                    avatar: group.repos.lazy.compactMap { app.summary(for: $0.nameWithOwner)?.owner.avatarUrl }.first,
+                                    isViewer: group.owner.caseInsensitiveCompare(app.viewer?.login ?? "") == .orderedSame)
                 }
             }
         }
@@ -70,6 +73,10 @@ struct SidebarView: View {
                     Circle().fill(app.sidebarError == nil ? Theme.green : Theme.yellow).frame(width: 6, height: 6)
                     Text(syncText).font(.system(size: 11)).foregroundStyle(.secondary)
                     Spacer()
+                    Button { app.isManageReposOpen = true } label: { Image(systemName: "plus") }
+                        .buttonStyle(.plain)
+                        .foregroundStyle(.secondary)
+                        .help("Gérer les repos (⇧⌘P)")
                     Button { app.refresh() } label: { Image(systemName: "arrow.clockwise") }
                         .buttonStyle(.plain)
                         .foregroundStyle(.secondary)
@@ -80,6 +87,18 @@ struct SidebarView: View {
         .padding(.horizontal, 16)
         .padding(.vertical, 10)
     }
+
+    private func expandedBinding(_ group: RepoGroup) -> Binding<Bool> {
+        Binding(
+            get: { !collapsed.contains(group.id) },
+            set: { expanded in
+                var set = collapsed
+                if expanded { set.remove(group.id) } else { set.insert(group.id) }
+                collapsedRaw = set.sorted().joined(separator: ",")
+            })
+    }
+
+    private var collapsed: Set<String> { Set(collapsedRaw.split(separator: ",").map(String.init)) }
 
     private var syncText: String {
         guard let last = SyncClock.shared.lastSync else { return "Synchronisation…" }
@@ -101,17 +120,31 @@ struct SidebarView: View {
     }
 }
 
+private struct WorkspaceHeader: View {
+    var group: RepoGroup
+    var avatar: URL?
+    var isViewer: Bool
+
+    var body: some View {
+        HStack(spacing: 6) {
+            Avatar(url: avatar, size: 14, square: !isViewer)
+            Text(group.owner)
+            if isViewer { Text("perso").foregroundStyle(.tertiary) }
+        }
+    }
+}
+
 private struct PinnedRepoRow: View {
     var repo: PinnedRepo
     var summary: RepoSummary?
 
     var body: some View {
         HStack(spacing: 7) {
-            Avatar(url: summary?.owner.avatarUrl, size: 16, square: true)
+            Image(systemName: repo.localPath != nil ? "folder" : "book.closed")
+                .font(.system(size: 11))
+                .foregroundStyle(.secondary)
+                .frame(width: 16)
             Text(repo.name).lineLimit(1)
-            if repo.localPath != nil {
-                Image(systemName: "folder").font(.system(size: 9)).foregroundStyle(.tertiary)
-            }
             Spacer(minLength: 4)
             if let summary {
                 if summary.pullRequests.totalCount > 0 {

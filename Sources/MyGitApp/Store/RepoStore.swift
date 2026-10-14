@@ -21,6 +21,13 @@ struct PinnedRepo: Codable, Hashable, Identifiable {
     var htmlURL: URL { URL(string: "https://github.com/\(nameWithOwner)")! }
 }
 
+/// Pinned repos sharing a GitHub owner (user or organization).
+struct RepoGroup: Identifiable, Hashable {
+    var owner: String
+    var repos: [PinnedRepo]
+    var id: String { owner.lowercased() }
+}
+
 /// The curated sidebar list, persisted to `repos.json`.
 @MainActor @Observable
 final class RepoStore {
@@ -35,6 +42,24 @@ final class RepoStore {
     }
 
     var pinnedNames: Set<String> { Set(pinned.map { $0.nameWithOwner.lowercased() }) }
+
+    /// Workspaces in order of first appearance; repos keep their pinned order inside each.
+    var groups: [RepoGroup] {
+        var order: [String] = []
+        var byOwner: [String: RepoGroup] = [:]
+        for repo in pinned {
+            let key = repo.owner.lowercased()
+            if byOwner[key] == nil {
+                order.append(key)
+                byOwner[key] = RepoGroup(owner: repo.owner, repos: [])
+            }
+            byOwner[key]!.repos.append(repo)
+        }
+        return order.map { byOwner[$0]! }
+    }
+
+    /// Pinned repos in sidebar (grouped) order, used for ⌘1…⌘9.
+    var ordered: [PinnedRepo] { groups.flatMap(\.repos) }
 
     func contains(_ nameWithOwner: String) -> Bool {
         pinned.contains { $0.nameWithOwner.caseInsensitiveCompare(nameWithOwner) == .orderedSame }
@@ -63,8 +88,12 @@ final class RepoStore {
         contains(nameWithOwner) ? remove(nameWithOwner) : add(nameWithOwner)
     }
 
-    func move(from source: IndexSet, to destination: Int) {
-        pinned.move(fromOffsets: source, toOffset: destination)
+    /// Reorders repos inside one workspace.
+    func move(in group: RepoGroup, from source: IndexSet, to destination: Int) {
+        var groups = self.groups
+        guard let index = groups.firstIndex(where: { $0.id == group.id }) else { return }
+        groups[index].repos.move(fromOffsets: source, toOffset: destination)
+        pinned = groups.flatMap(\.repos)
         save()
     }
 
