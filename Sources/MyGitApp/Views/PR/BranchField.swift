@@ -63,7 +63,8 @@ private struct BranchSearchList: View {
     @State private var remote: [Branch] = []
     @State private var searching = false
     @State private var highlighted = 0
-    /// Pointer position at the last arrow key: rows scrolling under a still pointer must not steal the highlight.
+    /// Pointer position at the last key (arrow or typing): rows that scroll or get filtered under a still pointer
+    /// must not steal the highlight, only a pointer that actually moves.
     @State private var pointerAtKeyPress: NSPoint?
 
     /// Every space-separated term must appear in the name: `feat login` finds `feat/user-login`.
@@ -119,7 +120,10 @@ private struct BranchSearchList: View {
             }
         }
         .frame(width: 440, height: 380)
-        .onChange(of: query) { highlighted = 0 }
+        .onChange(of: query) {
+            pointerAtKeyPress = NSEvent.mouseLocation
+            highlighted = 0
+        }
         .task(id: query) {
             let text = query.trimmingCharacters(in: .whitespaces)
             guard !isComplete, !text.isEmpty else { remote = []; return }
