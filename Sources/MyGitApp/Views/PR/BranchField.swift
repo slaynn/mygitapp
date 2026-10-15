@@ -94,9 +94,10 @@ private struct BranchSearchList: View {
             ScrollViewReader { proxy in
                 ScrollView {
                     LazyVStack(spacing: 0) {
+                        // Identified by branch name only: an extra `.id(index)` made SwiftUI keep showing the rows
+                        // that were at those positions before filtering.
                         ForEach(Array(results.enumerated()), id: \.element.id) { index, branch in
                             row(branch, isHighlighted: index == highlighted)
-                                .id(index)
                                 .onHover { inside in
                                     guard inside, NSEvent.mouseLocation != pointerAtKeyPress else { return }
                                     highlighted = index
@@ -109,7 +110,10 @@ private struct BranchSearchList: View {
                     }
                     .padding(.vertical, 4)
                 }
-                .onChange(of: highlighted) { _, index in proxy.scrollTo(index) }
+                .onChange(of: highlighted) { _, index in
+                    let results = self.results
+                    if results.indices.contains(index) { proxy.scrollTo(results[index].id) }
+                }
             }
             if !isComplete && query.isEmpty {
                 Divider()
