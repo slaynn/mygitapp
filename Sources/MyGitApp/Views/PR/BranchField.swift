@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 
 /// Branch selector for repos with many branches: click, type to filter, ↑↓ to move, ↩ to pick.
@@ -62,7 +63,6 @@ private struct BranchSearchList: View {
     @State private var remote: [Branch] = []
     @State private var searching = false
     @State private var highlighted = 0
-    @FocusState private var focused: Bool
 
     /// Every space-separated term must appear in the name: `feat login` finds `feat/user-login`.
     private var results: [Branch] {
@@ -78,13 +78,11 @@ private struct BranchSearchList: View {
         VStack(spacing: 0) {
             HStack(spacing: 8) {
                 Image(systemName: "magnifyingglass").foregroundStyle(.secondary)
-                TextField("Rechercher une branche", text: $query)
-                    .textFieldStyle(.plain)
-                    .font(.system(size: 13))
-                    .focused($focused)
-                    .onSubmit { if results.indices.contains(highlighted) { pick(results[highlighted]) } }
-                    .onKeyPress(.downArrow) { highlighted = min(highlighted + 1, max(0, results.count - 1)); return .handled }
-                    .onKeyPress(.upArrow) { highlighted = max(highlighted - 1, 0); return .handled }
+                KeySearchField(text: $query, placeholder: "Rechercher une branche") { step in
+                    highlighted = min(max(highlighted + step, 0), max(0, results.count - 1))
+                } onSubmit: {
+                    if results.indices.contains(highlighted) { pick(results[highlighted]) }
+                }
                 if searching { ProgressView().controlSize(.small) }
             }
             .padding(10)
@@ -115,7 +113,6 @@ private struct BranchSearchList: View {
             }
         }
         .frame(width: 440, height: 380)
-        .onAppear { focused = true }
         .onChange(of: query) { highlighted = 0 }
         .task(id: query) {
             let text = query.trimmingCharacters(in: .whitespaces)
@@ -155,5 +152,84 @@ private struct BranchSearchList: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+    }
+}
+
+/// Search field that takes focus as soon as it is on screen and reports ↑ ↓ ↩. SwiftUI's focus doesn't reliably
+/// reach a field inside a popover opened by a click, and the arrows go to the field editor, never to `onKeyPress`.
+private struct KeySearchField: NSViewRepresentable {
+    @Binding var text: String
+    var placeholder: String
+    var onMove: (Int) -> Void
+    var onSubmit: () -> Void
+
+    func makeNSView(context: Context) -> FocusingTextField {
+        let field = FocusingTextField()
+        field.placeholderString = placeholder
+        field.isBordered = false
+        field.drawsBackground = false
+        field.focusRingType = .none
+        field.font = .systemFont(ofSize: 13)
+        field.cell?.lineBreakMode = .byTruncatingTail
+        field.delegate = context.coordinator
+        field.stringValue = text
+        return field
+    }
+
+    func updateNSView(_ field: FocusingTextField, context: Context) {
+        context.coordinator.parent = self
+        if field.stringValue != text { field.stringValue = text }
+    }
+
+    func makeCoordinator() -> Coordinator { Coordinator(parent: self) }
+
+    final class Coordinator: NSObject, NSTextFieldDelegate {
+        var parent: KeySearchField
+
+        init(parent: KeySearchField) { self.parent = parent }
+
+        func controlTextDidChange(_ notification: Notification) {
+            guard let field = notification.object as? NSTextField else { return }
+            parent.text = field.stringValue
+        }
+
+        func control(_ control: NSControl, textView: NSTextView, doCommandBy selector: Selector) -> Bool {
+            switch selector {
+            case #selector(NSResponder.moveUp(_:)): parent.onMove(-1)
+            case #selector(NSResponder.moveDown(_:)): parent.onMove(1)
+            case #selector(NSResponder.insertNewline(_:)): parent.onSubmit()
+            default: return false
+            }
+            return true
+        }
+    }
+}
+
+final class FocusingTextField: NSTextField {
+    private var keyObserver: NSObjectProtocol?
+
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        if let keyObserver { NotificationCenter.default.removeObserver(keyObserver) }
+        keyObserver = nil
+        guard let window else { return }
+        // The popover's window isn't key yet when the field lands in it, and the click that opened it can hand
+        // focus back to the sheet: retry over the first moments, and whenever the popover becomes key.
+        for delay in [0, 0.05, 0.2, 0.5] {
+            DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak self] in self?.takeFocus(in: window) }
+        }
+        keyObserver = NotificationCenter.default.addObserver(forName: NSWindow.didBecomeKeyNotification, object: window, queue: .main) {
+            [weak self] _ in MainActor.assumeIsolated { self?.takeFocus(in: window) }
+        }
+    }
+
+    private func takeFocus(in window: NSWindow) {
+        guard self.window === window, currentEditor() == nil || !window.isKeyWindow else { return }
+        window.makeKey()
+        window.makeFirstResponder(self)
+    }
+
+    deinit {
+        if let keyObserver { NotificationCenter.default.removeObserver(keyObserver) }
     }
 }
