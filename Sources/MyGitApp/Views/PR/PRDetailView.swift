@@ -77,7 +77,7 @@ struct PRDetailView: View {
             HStack(alignment: .firstTextBaseline, spacing: 10) {
                 PRStateIcon(state: s.state, isDraft: s.isDraft).font(.system(size: 17))
                 Text(s.title).font(.system(size: 19, weight: .semibold)).textSelection(.enabled)
-                Text("#\(s.number)").font(.system(size: 19)).foregroundStyle(.secondary)
+                PRNumberButton(ref: s.ref)
                 Spacer()
                 actions(s, extra: extra)
             }
@@ -189,6 +189,48 @@ struct PRDetailView: View {
             FilesTab(model: model, threads: pr.extra.reviewThreads.nodes)
         case .checks:
             ChecksTab(checks: pr.extra.checks, prURL: pr.summary.url)
+        }
+    }
+}
+
+/// `#742` in the PR header: click copies it, right-click offers the other formats.
+struct PRNumberButton: View {
+    var ref: PRRef
+    @State private var copied = false
+    @State private var hovering = false
+
+    var body: some View {
+        Button { copy("#\(ref.number)") } label: {
+            HStack(spacing: 5) {
+                Text("#\(ref.number)").font(.system(size: 19))
+                if copied {
+                    Label("Copié", systemImage: "checkmark")
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundStyle(Theme.green)
+                        .transition(.opacity)
+                }
+            }
+            .foregroundStyle(hovering ? .primary : .secondary)
+            .padding(.horizontal, 4)
+            .background(hovering ? Theme.hover : .clear, in: RoundedRectangle(cornerRadius: 5))
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .onHover { hovering = $0 }
+        .help("Copier #\(ref.number)")
+        .contextMenu {
+            Button("Copier #\(ref.number)") { copy("#\(ref.number)") }
+            Button("Copier \(ref.nameWithOwner)#\(ref.number)") { copy("\(ref.nameWithOwner)#\(ref.number)") }
+            Button("Copier l'URL") { copy(ref.htmlURL.absoluteString) }
+        }
+    }
+
+    private func copy(_ value: String) {
+        Pasteboard.copy(value)
+        withAnimation(.easeOut(duration: 0.15)) { copied = true }
+        Task {
+            try? await Task.sleep(for: .seconds(1.5))
+            withAnimation(.easeOut(duration: 0.3)) { copied = false }
         }
     }
 }
