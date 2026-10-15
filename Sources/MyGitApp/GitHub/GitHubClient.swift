@@ -260,7 +260,9 @@ extension GitHubClient {
         return map
     }
 
-    func newPullRequestContext(_ nameWithOwner: String) async throws -> NewPRContext {
+    /// Loads up to `maxPages` × 100 branches, sorted by latest commit. `branchQuery` filters them by name on
+    /// GitHub's side, to reach the ones past that limit.
+    func newPullRequestContext(_ nameWithOwner: String, branchQuery: String? = nil, maxPages: Int = 10) async throws -> NewPRContext {
         struct R: Decodable {
             struct Repo: Decodable {
                 struct Ref: Decodable {
@@ -270,33 +272,50 @@ extension GitHubClient {
                         var messageHeadline: String?
                         var author: Author?
                     }
-                    struct PRs: Decodable { struct PR: Decodable { var number: Int; var state: String }; var nodes: [PR] }
                     var name: String
                     var target: Target?
-                    var associatedPullRequests: PRs
                 }
+                struct PR: Decodable { var number: Int; var state: String; var headRefName: String }
+                struct PRs: Decodable { var nodes: [PR] }
                 struct Template: Decodable { var body: String? }
                 struct Default: Decodable { var name: String }
-                struct Refs: Decodable { var nodes: [Ref] }
+                struct Refs: Decodable { var pageInfo: PageInfo; var nodes: [Ref] }
                 var id: String
                 var defaultBranchRef: Default?
                 var pullRequestTemplates: [Template]?
+                var pullRequests: PRs?
                 var refs: Refs?
             }
             var repository: Repo?
         }
         let (owner, name) = try split(nameWithOwner)
-        guard let repo = try await graphql(Queries.newPullRequestContext, ["owner": owner, "name": name], as: R.self).repository else {
-            throw GitHubError.notFound
+        var first: R.Repo?
+        var refs: [R.Repo.Ref] = []
+        var cursor: String?
+        var isComplete = false
+        for _ in 0..<maxPages {
+            let variables: [String: Any?] = ["owner": owner, "name": name, "query": branchQuery, "after": cursor, "firstPage": cursor == nil]
+            guard let page = try await graphql(Queries.newPullRequestContext, variables, as: R.self).repository else {
+                throw GitHubError.notFound
+            }
+            first = first ?? page
+            refs += page.refs?.nodes ?? []
+            guard let info = page.refs?.pageInfo, info.hasNextPage else { isComplete = true; break }
+            cursor = info.endCursor
         }
-        let branches = (repo.refs?.nodes ?? []).map { ref in
-            let pr = ref.associatedPullRequests.nodes.first
+        guard let repo = first else { throw GitHubError.notFound }
+        var latestPR: [String: R.Repo.PR] = [:] // newest first, so the first one seen per branch wins
+        for pr in repo.pullRequests?.nodes ?? [] where latestPR[pr.headRefName] == nil { latestPR[pr.headRefName] = pr }
+        let branches = refs.map { ref in
+            let pr = latestPR[ref.name]
             return NewPRContext.Branch(name: ref.name, committedDate: ref.target?.committedDate, headline: ref.target?.messageHeadline,
                                        authorLogin: ref.target?.author?.user?.login,
                                        openPR: pr?.state == "OPEN" ? pr?.number : nil, hasPR: pr != nil)
         }
+        .sorted { ($0.committedDate ?? .distantPast) > ($1.committedDate ?? .distantPast) }
         let template = repo.pullRequestTemplates?.lazy.compactMap(\.body).first { !$0.isEmpty }
-        return NewPRContext(repositoryId: repo.id, defaultBranch: repo.defaultBranchRef?.name, template: template, branches: branches)
+        return NewPRContext(repositoryId: repo.id, defaultBranch: repo.defaultBranchRef?.name, template: template,
+                            branches: branches, isComplete: isComplete)
     }
 
     func compare(_ nameWithOwner: String, base: String, head: String) async throws -> BranchComparison {

@@ -105,37 +105,32 @@ struct NewPullRequestSheet: View {
     // MARK: Branches
 
     private var branchRow: some View {
-        HStack(spacing: 8) {
-            branchPicker("base", selection: $base, branches: context?.branches ?? [])
+        let branches = context?.branches ?? []
+        let isComplete = context?.isComplete ?? true
+        return HStack(spacing: 8) {
+            BranchField(label: "base", selection: base, branches: branches, isComplete: isComplete, search: searchBranches) { branch in
+                adopt(branch)
+                base = branch.name
+            }
             Image(systemName: "arrow.left").foregroundStyle(.secondary)
-            branchPicker("compare", selection: Binding(get: { head }, set: { head = $0; headFallbacks = nil }), branches: (context?.branches ?? []).filter { $0.name != base })
+            BranchField(label: "compare", selection: head, branches: branches.filter { $0.name != base }, isComplete: isComplete,
+                        search: searchBranches) { branch in
+                adopt(branch)
+                head = branch.name
+                headFallbacks = nil
+            }
             ProgressView().controlSize(.small).opacity(comparing ? 1 : 0)
         }
     }
 
-    private func branchPicker(_ label: String, selection: Binding<String>, branches: [NewPRContext.Branch]) -> some View {
-        HStack(spacing: 6) {
-            Text(label).font(.caption).foregroundStyle(.secondary)
-            Picker(label, selection: selection) {
-                if !branches.contains(where: { $0.name == selection.wrappedValue }) {
-                    Text(selection.wrappedValue.isEmpty ? "Choisir…" : selection.wrappedValue).tag(selection.wrappedValue)
-                }
-                ForEach(branches) { branch in
-                    Text(branchLabel(branch)).tag(branch.name)
-                }
-            }
-            .labelsHidden()
-            .font(Theme.mono)
-        }
-        // A menu picker is as wide as its longest option: cap it so long branch names don't widen the sheet.
-        .frame(maxWidth: .infinity)
+    private func searchBranches(_ query: String) async -> [NewPRContext.Branch] {
+        guard let client = app.client else { return [] }
+        return (try? await client.newPullRequestContext(repo, branchQuery: query, maxPages: 1).branches) ?? []
     }
 
-    private func branchLabel(_ branch: NewPRContext.Branch) -> String {
-        var parts = [branch.name]
-        if let date = branch.committedDate { parts.append(date.shortAgo) }
-        if let pr = branch.openPR { parts.append("PR #\(pr)") }
-        return parts.joined(separator: "  ·  ")
+    /// A branch found by searching GitHub joins the loaded list, so it can be compared.
+    private func adopt(_ branch: NewPRContext.Branch) {
+        if context?.branches.contains(where: { $0.name == branch.name }) == false { context?.branches.append(branch) }
     }
 
     private var selectedBranch: NewPRContext.Branch? { context?.branches.first { $0.name == head } }

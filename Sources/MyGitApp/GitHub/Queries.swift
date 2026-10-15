@@ -212,18 +212,23 @@ enum Queries {
     }
     """
 
-    /// What the "new pull request" form needs: branches (most recent first) with their open PR, and the PR template.
+    /// What the "new pull request" form needs: a page of branches (optionally filtered by name), plus on the first
+    /// page the PR template and the latest PRs to tell which branches already have one. Asking each branch for its
+    /// PRs instead triples the time per page. GitHub ignores the commit-date order for branches, so callers sort.
     static let newPullRequestContext = """
-    query($owner: String!, $name: String!) {
+    query($owner: String!, $name: String!, $query: String, $after: String, $firstPage: Boolean!) {
       repository(owner: $owner, name: $name) {
         id
         defaultBranchRef { name }
-        pullRequestTemplates { body }
-        refs(refPrefix: "refs/heads/", first: 100, orderBy: { field: TAG_COMMIT_DATE, direction: DESC }) {
+        pullRequestTemplates @include(if: $firstPage) { body }
+        pullRequests(first: 100, orderBy: { field: CREATED_AT, direction: DESC }) @include(if: $firstPage) {
+          nodes { number state headRefName }
+        }
+        refs(refPrefix: "refs/heads/", first: 100, query: $query, after: $after) {
+          pageInfo { hasNextPage endCursor }
           nodes {
             name
             target { ... on Commit { committedDate messageHeadline author { user { login } } } }
-            associatedPullRequests(first: 1, orderBy: { field: CREATED_AT, direction: DESC }) { nodes { number state } }
           }
         }
       }

@@ -1,0 +1,159 @@
+import SwiftUI
+
+/// Branch selector for repos with many branches: click, type to filter, ↑↓ to move, ↩ to pick.
+struct BranchField: View {
+    typealias Branch = NewPRContext.Branch
+
+    var label: String
+    var selection: String
+    /// Loaded branches, most recent first.
+    var branches: [Branch]
+    /// False when `branches` is a truncated list: typing then also searches GitHub.
+    var isComplete: Bool
+    var search: (String) async -> [Branch]
+    var onSelect: (Branch) -> Void
+    @State private var isOpen = false
+
+    var body: some View {
+        HStack(spacing: 6) {
+            Text(label).font(.caption).foregroundStyle(.secondary)
+            Button { isOpen = true } label: {
+                HStack(spacing: 6) {
+                    Image(systemName: "arrow.triangle.branch").font(.system(size: 11)).foregroundStyle(.secondary)
+                    Text(selection.isEmpty ? "Choisir une branche…" : selection)
+                        .font(Theme.mono)
+                        .foregroundStyle(selection.isEmpty ? .secondary : .primary)
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+                    Spacer(minLength: 4)
+                    Image(systemName: "chevron.up.chevron.down").font(.system(size: 9, weight: .semibold)).foregroundStyle(.secondary)
+                }
+                .padding(.horizontal, 8)
+                .frame(height: 26)
+                .background(Theme.background, in: RoundedRectangle(cornerRadius: 6))
+                .overlay(RoundedRectangle(cornerRadius: 6).stroke(isOpen ? Theme.blue.opacity(0.6) : Theme.border))
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .popover(isPresented: $isOpen, arrowEdge: .bottom) {
+                BranchSearchList(selection: selection, branches: branches, isComplete: isComplete, search: search) { branch in
+                    isOpen = false
+                    onSelect(branch)
+                }
+            }
+        }
+        .frame(maxWidth: .infinity)
+        .task(id: branches.isEmpty) {
+            if !branches.isEmpty, DebugHooks.openBranchField == label { isOpen = true }
+        }
+    }
+}
+
+private struct BranchSearchList: View {
+    typealias Branch = NewPRContext.Branch
+
+    var selection: String
+    var branches: [Branch]
+    var isComplete: Bool
+    var search: (String) async -> [Branch]
+    var pick: (Branch) -> Void
+
+    @State private var query = DebugHooks.branchQuery
+    @State private var remote: [Branch] = []
+    @State private var searching = false
+    @State private var highlighted = 0
+    @FocusState private var focused: Bool
+
+    /// Every space-separated term must appear in the name: `feat login` finds `feat/user-login`.
+    private var results: [Branch] {
+        let terms = query.lowercased().split(separator: " ")
+        let matches = { (branch: Branch) in terms.allSatisfy { branch.name.lowercased().contains($0) } }
+        let local = branches.filter(matches)
+        let known = Set(local.map(\.name))
+        return local + remote.filter { !known.contains($0.name) && matches($0) }
+    }
+
+    var body: some View {
+        let results = results
+        VStack(spacing: 0) {
+            HStack(spacing: 8) {
+                Image(systemName: "magnifyingglass").foregroundStyle(.secondary)
+                TextField("Rechercher une branche", text: $query)
+                    .textFieldStyle(.plain)
+                    .font(.system(size: 13))
+                    .focused($focused)
+                    .onSubmit { if results.indices.contains(highlighted) { pick(results[highlighted]) } }
+                    .onKeyPress(.downArrow) { highlighted = min(highlighted + 1, max(0, results.count - 1)); return .handled }
+                    .onKeyPress(.upArrow) { highlighted = max(highlighted - 1, 0); return .handled }
+                if searching { ProgressView().controlSize(.small) }
+            }
+            .padding(10)
+            Divider()
+            ScrollViewReader { proxy in
+                ScrollView {
+                    LazyVStack(spacing: 0) {
+                        ForEach(Array(results.enumerated()), id: \.element.id) { index, branch in
+                            row(branch, isHighlighted: index == highlighted)
+                                .id(index)
+                                .onHover { if $0 { highlighted = index } }
+                        }
+                        if results.isEmpty && !searching {
+                            Text(query.isEmpty ? "Aucune branche." : "Aucune branche ne contient « \(query) ».")
+                                .font(.callout).foregroundStyle(.secondary).padding(20)
+                        }
+                    }
+                    .padding(.vertical, 4)
+                }
+                .onChange(of: highlighted) { _, index in proxy.scrollTo(index) }
+            }
+            if !isComplete && query.isEmpty {
+                Divider()
+                Text("\(branches.count) branches chargées sur un plus grand nombre. Tape pour chercher dans toutes.")
+                    .font(.caption).foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, 10).padding(.vertical, 6)
+            }
+        }
+        .frame(width: 440, height: 380)
+        .onAppear { focused = true }
+        .onChange(of: query) { highlighted = 0 }
+        .task(id: query) {
+            let text = query.trimmingCharacters(in: .whitespaces)
+            guard !isComplete, !text.isEmpty else { remote = []; return }
+            try? await Task.sleep(for: .milliseconds(250))
+            guard !Task.isCancelled else { return }
+            searching = true
+            let found = await search(text)
+            if !Task.isCancelled { remote = found }
+            searching = false
+        }
+    }
+
+    private func row(_ branch: Branch, isHighlighted: Bool) -> some View {
+        Button { pick(branch) } label: {
+            HStack(spacing: 8) {
+                Image(systemName: "checkmark")
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundStyle(Theme.blue)
+                    .opacity(branch.name == selection ? 1 : 0)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(branch.name).font(Theme.mono).lineLimit(1).truncationMode(.middle)
+                    HStack(spacing: 4) {
+                        if let date = branch.committedDate { Text(date.shortAgo) }
+                        if let headline = branch.headline { Text("· \(headline)").lineLimit(1) }
+                    }
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                }
+                Spacer(minLength: 6)
+                if let pr = branch.openPR { Badge(text: "PR #\(pr)", color: Theme.green) }
+            }
+            .padding(.horizontal, 10)
+            .padding(.vertical, 5)
+            .background(isHighlighted ? Theme.blue.opacity(0.15) : .clear, in: RoundedRectangle(cornerRadius: 6))
+            .padding(.horizontal, 4)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+    }
+}
