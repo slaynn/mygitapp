@@ -63,6 +63,8 @@ private struct BranchSearchList: View {
     @State private var remote: [Branch] = []
     @State private var searching = false
     @State private var highlighted = 0
+    /// Pointer position at the last arrow key: rows scrolling under a still pointer must not steal the highlight.
+    @State private var pointerAtKeyPress: NSPoint?
 
     /// Every space-separated term must appear in the name: `feat login` finds `feat/user-login`.
     private var results: [Branch] {
@@ -79,6 +81,7 @@ private struct BranchSearchList: View {
             HStack(spacing: 8) {
                 Image(systemName: "magnifyingglass").foregroundStyle(.secondary)
                 KeySearchField(text: $query, placeholder: "Rechercher une branche") { step in
+                    pointerAtKeyPress = NSEvent.mouseLocation
                     highlighted = min(max(highlighted + step, 0), max(0, results.count - 1))
                 } onSubmit: {
                     if results.indices.contains(highlighted) { pick(results[highlighted]) }
@@ -93,7 +96,10 @@ private struct BranchSearchList: View {
                         ForEach(Array(results.enumerated()), id: \.element.id) { index, branch in
                             row(branch, isHighlighted: index == highlighted)
                                 .id(index)
-                                .onHover { if $0 { highlighted = index } }
+                                .onHover { inside in
+                                    guard inside, NSEvent.mouseLocation != pointerAtKeyPress else { return }
+                                    highlighted = index
+                                }
                         }
                         if results.isEmpty && !searching {
                             Text(query.isEmpty ? "Aucune branche." : "Aucune branche ne contient « \(query) ».")
