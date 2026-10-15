@@ -513,7 +513,7 @@ struct NewPRContext: Codable, Hashable {
         var authorLogin: String?
         /// Number of the open PR whose head is this branch.
         var openPR: Int?
-        /// Whether any PR (open, merged or closed) was opened from this branch.
+        /// Whether a PR (open, merged or closed) was opened from this branch, among the repo's 100 latest PRs.
         var hasPR = false
         var id: String { name }
 
@@ -526,6 +526,8 @@ struct NewPRContext: Codable, Hashable {
     var template: String?
     /// Most recent commit first.
     var branches: [Branch]
+    /// False when the repo has more branches than were loaded.
+    var isComplete = true
 }
 
 /// REST `compare/base...head`.

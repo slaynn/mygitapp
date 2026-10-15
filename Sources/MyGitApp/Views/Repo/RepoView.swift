@@ -43,7 +43,7 @@ struct RepoView: View {
         .task(id: LoadKey(name: nameWithOwner, tick: app.refreshTick)) {
             guard let client = app.client else { return }
             async let o: Void = overview.load("repo-\(nameWithOwner)") { try await client.repoOverview(nameWithOwner) }
-            async let b = try? client.newPullRequestContext(nameWithOwner)
+            async let b = try? client.newPullRequestContext(nameWithOwner, maxPages: 3)
             _ = await o
             prContext = await b
         }
