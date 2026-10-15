@@ -22,6 +22,9 @@ enum Theme {
     static let blue = Color.adaptive(light: 0x0969DA, dark: 0x58A6FF)
     static let gray = Color.adaptive(light: 0x59636E, dark: 0x8B949E)
 
+    /// Height of the bar under the title bar (sidebar profile row, repo bar), so both sides line up.
+    static let topBarHeight: CGFloat = 48
+
     static let mono = Font.system(size: 12, design: .monospaced)
     static let monoSmall = Font.system(size: 11, design: .monospaced)
 

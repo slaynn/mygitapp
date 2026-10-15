@@ -64,7 +64,7 @@ struct SidebarView: View {
                 .help("Rechercher (⌘K)")
         }
         .padding(.horizontal, 16)
-        .padding(.vertical, 8)
+        .frame(height: Theme.topBarHeight)
     }
 
     private var footer: some View {

@@ -71,6 +71,7 @@ struct NewPullRequestSheet: View {
         }
         .frame(width: 720, height: 660)
         .background(Theme.panel)
+        .dismissOnOutsideClick(dismiss)
         .task(id: repo) { await loadContext() }
         .task(id: CompareKey(repo: repo, base: base, head: head)) { await compare() }
     }
