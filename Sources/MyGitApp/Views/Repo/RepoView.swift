@@ -84,7 +84,7 @@ struct RepoView: View {
             .buttonStyle(.bordered)
         }
         .padding(.horizontal, 20)
-        .padding(.vertical, 10)
+        .frame(height: Theme.topBarHeight)
     }
 
     private func tabButton(_ title: String, _ value: Tab, count: Int? = nil) -> some View {

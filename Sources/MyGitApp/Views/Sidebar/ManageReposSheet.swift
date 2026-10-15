@@ -31,6 +31,7 @@ struct ManageReposSheet: View {
         }
         .frame(width: 620, height: 560)
         .background(Theme.panel)
+        .dismissOnOutsideClick(dismiss)
     }
 }
 

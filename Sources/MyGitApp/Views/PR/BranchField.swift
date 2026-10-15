@@ -188,7 +188,9 @@ private struct KeySearchField: NSViewRepresentable {
 
     func updateNSView(_ field: FocusingTextField, context: Context) {
         context.coordinator.parent = self
-        if field.stringValue != text { field.stringValue = text }
+        // While typing, SwiftUI can hand back the text from one keystroke ago: writing it would reset the
+        // field editor and throw the insertion point around. The field is the source of truth then.
+        if field.currentEditor() == nil, field.stringValue != text { field.stringValue = text }
     }
 
     func makeCoordinator() -> Coordinator { Coordinator(parent: self) }
@@ -233,10 +235,11 @@ final class FocusingTextField: NSTextField {
         }
     }
 
+    /// Never while editing: making the field first responder again selects its text and moves the insertion point.
     private func takeFocus(in window: NSWindow) {
-        guard self.window === window, currentEditor() == nil || !window.isKeyWindow else { return }
-        window.makeKey()
-        window.makeFirstResponder(self)
+        guard self.window === window else { return }
+        if !window.isKeyWindow { window.makeKey() }
+        if currentEditor() == nil { window.makeFirstResponder(self) }
     }
 
     deinit {

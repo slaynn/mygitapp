@@ -436,3 +436,34 @@ struct CopyButton: View {
         }
     }
 }
+
+// MARK: - Sheets
+
+extension View {
+    /// Closes a sheet when the window behind it is clicked, like a popover. Clicks in the sheet itself, or in a
+    /// popover opened from it, don't count.
+    func dismissOnOutsideClick(_ dismiss: DismissAction) -> some View {
+        modifier(OutsideClickDismiss(dismiss: dismiss))
+    }
+}
+
+private struct OutsideClickDismiss: ViewModifier {
+    var dismiss: DismissAction
+    @State private var monitor: Any?
+
+    func body(content: Content) -> some View {
+        content
+            .onAppear {
+                monitor = NSEvent.addLocalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { event in
+                    // The window behind a sheet is the one that has it attached.
+                    guard event.window?.attachedSheet != nil else { return event }
+                    dismiss()
+                    return nil
+                }
+            }
+            .onDisappear {
+                if let monitor { NSEvent.removeMonitor(monitor) }
+                monitor = nil
+            }
+    }
+}

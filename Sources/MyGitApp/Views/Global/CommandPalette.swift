@@ -66,6 +66,7 @@ struct CommandPalette: View {
         }
         .frame(width: 560, height: 420)
         .background(Theme.panel)
+        .dismissOnOutsideClick(dismiss)
         .onAppear { focused = true }
         .onChange(of: query) { selected = 0 }
     }
