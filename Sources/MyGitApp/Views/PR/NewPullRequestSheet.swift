@@ -11,6 +11,8 @@ struct NewPullRequestSheet: View {
     @State private var loadError: String?
     @State private var base = ""
     @State private var head = ""
+    /// Next guesses for `head` while it is still auto-picked: tried in turn when a guess brings no commit.
+    @State private var headFallbacks: [String]?
     @State private var comparison: BranchComparison?
     @State private var comparing = false
     @State private var compareError: String?
@@ -106,9 +108,8 @@ struct NewPullRequestSheet: View {
         HStack(spacing: 8) {
             branchPicker("base", selection: $base, branches: context?.branches ?? [])
             Image(systemName: "arrow.left").foregroundStyle(.secondary)
-            branchPicker("compare", selection: $head, branches: (context?.branches ?? []).filter { $0.name != base })
-            Spacer()
-            if comparing { ProgressView().controlSize(.small) }
+            branchPicker("compare", selection: Binding(get: { head }, set: { head = $0; headFallbacks = nil }), branches: (context?.branches ?? []).filter { $0.name != base })
+            ProgressView().controlSize(.small).opacity(comparing ? 1 : 0)
         }
     }
 
@@ -124,9 +125,10 @@ struct NewPullRequestSheet: View {
                 }
             }
             .labelsHidden()
-            .fixedSize()
             .font(Theme.mono)
         }
+        // A menu picker is as wide as its longest option: cap it so long branch names don't widen the sheet.
+        .frame(maxWidth: .infinity)
     }
 
     private func branchLabel(_ branch: NewPRContext.Branch) -> String {
@@ -312,7 +314,10 @@ struct NewPullRequestSheet: View {
             guard !Task.isCancelled else { return }
             context = fresh
             base = fresh.defaultBranch ?? fresh.branches.first?.name ?? ""
-            head = defaultHead(in: fresh)
+            let guesses = defaultHeads(in: fresh)
+            let explicit = (request.head != nil && request.repo == repo) || local.map { $0.branch != fresh.defaultBranch } == true
+            head = guesses.first ?? ""
+            headFallbacks = explicit ? nil : Array(guesses.dropFirst())
             titleFocused = true
         } catch is CancellationError {
         } catch let error as URLError where error.code == .cancelled {
@@ -321,17 +326,18 @@ struct NewPullRequestSheet: View {
         }
     }
 
-    /// The branch asked for, else the clone's checked-out branch, else my latest branch that never had a PR.
-    private func defaultHead(in context: NewPRContext) -> String {
-        let candidates = context.branches.filter { $0.name != context.defaultBranch }
-        if let wanted = request.head, request.repo == repo { return wanted }
-        if let local, local.branch != context.defaultBranch { return local.branch }
+    /// The branch asked for, else the clone's checked-out branch, else my latest branches from the last two weeks
+    /// that never had a PR. Otherwise none: an old branch is rarely the one to propose.
+    private func defaultHeads(in context: NewPRContext) -> [String] {
+        if let wanted = request.head, request.repo == repo { return [wanted] }
+        if let local, local.branch != context.defaultBranch { return [local.branch] }
+        let cutoff = Date.now.addingTimeInterval(-14 * 86_400)
         let me = app.viewer?.login
-        return candidates.first { !$0.hasPR && $0.isProbablyMine(me) }?.name
-            ?? candidates.first { !$0.hasPR }?.name
-            ?? candidates.first { $0.openPR == nil }?.name
-            ?? candidates.first?.name
-            ?? ""
+        let candidates = context.branches.filter {
+            $0.name != context.defaultBranch && !$0.hasPR && ($0.committedDate ?? .distantPast) > cutoff
+        }
+        let ordered = candidates.filter { $0.isProbablyMine(me) } + candidates.filter { !$0.isProbablyMine(me) }
+        return ordered.prefix(4).map(\.name)
     }
 
     private func localState(branches: [NewPRContext.Branch]) async -> LocalState? {
@@ -352,6 +358,12 @@ struct NewPullRequestSheet: View {
         defer { comparing = false }
         do {
             let result = try await client.compare(repo, base: base, head: head)
+            if result.ahead_by == 0, var fallbacks = headFallbacks {
+                // An auto-picked branch that brings nothing (already merged): try the next guess, or pick none.
+                head = fallbacks.isEmpty ? "" : fallbacks.removeFirst()
+                headFallbacks = fallbacks
+                return
+            }
             comparison = result
             prefill(result)
         } catch is CancellationError {
