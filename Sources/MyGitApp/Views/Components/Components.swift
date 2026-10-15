@@ -38,7 +38,7 @@ struct Avatar: View {
             if let image {
                 Image(nsImage: image).resizable().interpolation(.high)
             } else {
-                Color.white.opacity(0.08)
+                Theme.fill
             }
         }
         .frame(width: size, height: size)
@@ -69,7 +69,7 @@ struct Badge: View {
             .font(.system(size: 10.5, weight: .medium))
             .padding(.horizontal, 6)
             .padding(.vertical, 2)
-            .foregroundStyle(filled ? Color.black.opacity(0.85) : color)
+            .foregroundStyle(filled ? Theme.onAccent : color)
             .background(filled ? color : color.opacity(0.14), in: Capsule())
             .overlay(Capsule().stroke(color.opacity(filled ? 0 : 0.3), lineWidth: 0.5))
             .lineLimit(1)
@@ -249,14 +249,14 @@ struct TabPill: View {
                         .font(.system(size: 11, weight: .medium))
                         .padding(.horizontal, 6)
                         .padding(.vertical, 1)
-                        .background((highlight ?? .white).opacity(highlight == nil ? 0.08 : 0.2), in: Capsule())
+                        .background(highlight?.opacity(0.2) ?? Theme.fill, in: Capsule())
                         .foregroundStyle(highlight ?? .secondary)
                 }
             }
             .font(.system(size: 13, weight: isSelected ? .medium : .regular))
             .padding(.horizontal, 11)
             .frame(height: 28)
-            .background(isSelected ? Color.white.opacity(0.09) : .clear, in: RoundedRectangle(cornerRadius: 7))
+            .background(isSelected ? Theme.fill : .clear, in: RoundedRectangle(cornerRadius: 7))
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
