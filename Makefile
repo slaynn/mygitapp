@@ -1,4 +1,4 @@
-.PHONY: build test app run debug install clean
+.PHONY: build test app run debug install update icon clean
 
 build:
 	swift build
@@ -20,6 +20,14 @@ debug:
 install: app
 	rm -rf /Applications/MyGitApp.app
 	cp -R build/MyGitApp.app /Applications/
+
+# Latest release built by GitHub Actions, without compiling locally.
+update:
+	scripts/install-latest.sh
+
+icon:
+	rm -f assets/AppIcon.icns
+	scripts/bundle.sh debug
 
 clean:
 	rm -rf .build build

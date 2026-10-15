@@ -34,6 +34,24 @@ make debug     # build debug, plus rapide à itérer
 
 Le projet est un Swift Package : `open Package.swift` l'ouvre dans Xcode.
 
+## Releases
+
+Chaque push sur `main` (hors changements de `.md`) lance `.github/workflows/release.yml` : tests, build,
+puis une release GitHub `vX.Y.N` avec `MyGitApp-X.Y.N.zip` (`X.Y` vient du fichier `VERSION`, `N` est le
+numéro du run).
+
+Le job tourne sur le runner self-hosted du Mac mini (`~/ci/mygitapp/runner`, service launchd
+`actions.runner.slaynn-mygitapp.mac-mini-m1-mygitapp`) : aucune minute GitHub consommée. Si le Mac mini est
+éteint, le job attend dans la file jusqu'à son retour.
+
+```sh
+make update    # installe la dernière release dans /Applications (sans compiler)
+```
+
+L'app n'est pas signée avec un certificat Apple : `make update` télécharge via `gh`, ce qui évite la
+quarantaine de Gatekeeper. Si tu télécharges le zip depuis le navigateur, ouvre l'app avec clic droit → Ouvrir
+(ou `xattr -dr com.apple.quarantine /Applications/MyGitApp.app`).
+
 ## Raccourcis
 
 | | |

@@ -1,0 +1,57 @@
+# Every push to main: run the tests, build MyGitApp.app and publish it as a GitHub release.
+# Runs on the Mac mini self-hosted runner, using its installed Xcode.
+name: Release
+
+on:
+  push:
+    branches: [main]
+    paths-ignore:
+      - "**.md"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    # Self-hosted runner on the Mac mini (~/ci/mygitapp/runner): no hosted macOS minutes used.
+    # If the Mac mini is off, the job waits in the queue until it's back.
+    runs-on: [self-hosted, macOS, ARM64, mygitapp]
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Keep .build between runs for incremental builds.
+          clean: false
+
+      - name: Test
+        run: swift test
+
+      - name: Version
+        id: version
+        run: echo "version=$(cat VERSION).${{ github.run_number }}" >> "$GITHUB_OUTPUT"
+
+      - name: Build app
+        env:
+          APP_VERSION: ${{ steps.version.outputs.version }}
+          APP_BUILD: ${{ github.run_number }}
+        run: scripts/bundle.sh release
+
+      - name: Package
+        run: |
+          rm -f build/MyGitApp-*.zip
+          ditto -c -k --keepParent build/MyGitApp.app "build/MyGitApp-${{ steps.version.outputs.version }}.zip"
+
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          gh release create "v$VERSION" "build/MyGitApp-$VERSION.zip" \
+            --target "$GITHUB_SHA" \
+            --title "MyGitApp $VERSION" \
+            --generate-notes
