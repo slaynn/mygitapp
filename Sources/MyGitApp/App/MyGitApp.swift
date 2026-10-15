@@ -38,6 +38,11 @@ struct AppCommands: Commands {
     @Binding var appearance: Appearance
 
     var body: some Commands {
+        CommandGroup(replacing: .newItem) {
+            Button("Nouvelle pull request…") { app.startNewPullRequest() }
+                .keyboardShortcut("n")
+                .disabled(app.auth != .signedIn)
+        }
         CommandGroup(after: .appInfo) {
             Button("Rechercher des mises à jour…") {
                 Task { await Updater.shared.check(app.client, manual: true) }
@@ -131,6 +136,7 @@ struct MainView: View {
         }
         .sheet(isPresented: $app.isManageReposOpen) { ManageReposSheet() }
         .sheet(isPresented: $app.isCommandPaletteOpen) { CommandPalette() }
+        .sheet(item: $app.newPullRequest) { NewPullRequestSheet(request: $0) }
     }
 
     @ViewBuilder private var rootDetail: some View {

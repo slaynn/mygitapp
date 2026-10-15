@@ -1,7 +1,7 @@
 import AppKit
 
 /// Dev-only automation, inert unless `MYGITAPP_SNAPSHOT` is set:
-///   MYGITAPP_OPEN=owner/repo | owner/repo#12 | inbox | reviews | prs | manage | palette
+///   MYGITAPP_OPEN=owner/repo | owner/repo#12 | inbox | reviews | prs | manage | palette | newpr:owner/repo
 ///   MYGITAPP_TAB=conversation | threads | files | checks           PR tab
 ///   MYGITAPP_SNAPSHOT=/path/shot.png                               window capture, then quit
 enum DebugHooks {
@@ -18,10 +18,11 @@ enum DebugHooks {
             case "prs": app.selection = .pullRequests
             case "manage": app.isManageReposOpen = true
             case "palette": app.isCommandPaletteOpen = true
+            case _ where target.hasPrefix("newpr:"): app.startNewPullRequest(repo: String(target.dropFirst("newpr:".count)))
             default:
                 let parts = target.split(separator: "#")
                 let repo = String(parts[0])
-                app.selection = app.isPinned(repo) ? .repo(app.store.repo(named: repo)!.nameWithOwner) : .home
+                app.openRepo(repo)
                 if parts.count == 2, let number = Int(parts[1]), let ref = PRRef(nameWithOwner: repo, number: number) {
                     try? await Task.sleep(for: .milliseconds(300))
                     app.open(ref)

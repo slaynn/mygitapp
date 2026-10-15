@@ -502,3 +502,48 @@ struct GHNotification: Codable, Hashable, Identifiable {
         return URL(string: "https://github.com/\(repository.full_name)")!
     }
 }
+
+// MARK: - New pull request
+
+struct NewPRContext: Codable, Hashable {
+    struct Branch: Codable, Hashable, Identifiable {
+        var name: String
+        var committedDate: Date?
+        var headline: String?
+        var authorLogin: String?
+        /// Number of the open PR whose head is this branch.
+        var openPR: Int?
+        /// Whether any PR (open, merged or closed) was opened from this branch.
+        var hasPR = false
+        var id: String { name }
+
+        /// Mine, or by an author GitHub couldn't match to an account (commit email not linked).
+        func isProbablyMine(_ login: String?) -> Bool { authorLogin == nil || authorLogin == login }
+    }
+
+    var repositoryId: String
+    var defaultBranch: String?
+    var template: String?
+    /// Most recent commit first.
+    var branches: [Branch]
+}
+
+/// REST `compare/base...head`.
+struct BranchComparison: Codable, Hashable {
+    struct Commit: Codable, Hashable {
+        struct Inner: Codable, Hashable { var message: String }
+        var sha: String
+        var commit: Inner
+        var subject: String { commit.message.split(separator: "\n", maxSplits: 1).first.map(String.init) ?? "" }
+    }
+    struct File: Codable, Hashable { var filename: String; var additions: Int; var deletions: Int }
+
+    var ahead_by: Int
+    var behind_by: Int
+    /// Oldest first.
+    var commits: [Commit]
+    var files: [File]?
+
+    var additions: Int { files?.reduce(0) { $0 + $1.additions } ?? 0 }
+    var deletions: Int { files?.reduce(0) { $0 + $1.deletions } ?? 0 }
+}
