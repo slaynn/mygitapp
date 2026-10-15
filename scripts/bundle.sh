@@ -15,21 +15,20 @@ rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 cp "$BIN" "$APP/Contents/MacOS/MyGitApp"
 
-# App icon: assets/AppIcon.icns is committed (CI runners can't render SVG with Quick Look).
-# Regenerate it from assets/icon.svg with `make icon`.
+# App icon: assets/AppIcon.icns and assets/icon.png are committed so CI doesn't render SVG.
+# Regenerate them from assets/icon.svg with `make icon`.
 ICNS="$ROOT/assets/AppIcon.icns"
 if [[ ! -f "$ICNS" ]]; then
   TMP="$(mktemp -d)"
-  qlmanage -t -s 1024 -o "$TMP" "$ROOT/assets/icon.svg" >/dev/null 2>&1 || true
-  if [[ -f "$TMP/icon.svg.png" ]]; then
-    ICONSET="$TMP/AppIcon.iconset"
-    mkdir -p "$ICONSET"
-    for size in 16 32 128 256 512; do
-      sips -z $size $size "$TMP/icon.svg.png" --out "$ICONSET/icon_${size}x${size}.png" >/dev/null
-      sips -z $((size * 2)) $((size * 2)) "$TMP/icon.svg.png" --out "$ICONSET/icon_${size}x${size}@2x.png" >/dev/null
-    done
-    iconutil -c icns "$ICONSET" -o "$ICNS"
-  fi
+  ICONSET="$TMP/AppIcon.iconset"
+  mkdir -p "$ICONSET"
+  render() { swift "$ROOT/scripts/render-icon.swift" "$ROOT/assets/icon.svg" "$1" "$2"; }
+  for size in 16 32 128 256 512; do
+    render "$ICONSET/icon_${size}x${size}.png" $size
+    render "$ICONSET/icon_${size}x${size}@2x.png" $((size * 2))
+  done
+  iconutil -c icns "$ICONSET" -o "$ICNS"
+  render "$ROOT/assets/icon.png" 256
   rm -rf "$TMP"
 fi
 [[ -f "$ICNS" ]] && cp "$ICNS" "$APP/Contents/Resources/AppIcon.icns"
