@@ -94,6 +94,19 @@ final class GitHubClient: @unchecked Sendable {
         return try JSONDecoder.github.decode(T.self, from: data)
     }
 
+    /// Downloads a release asset (works for private repos) to a temporary file.
+    func downloadAsset(_ url: URL) async throws -> URL {
+        var request = makeRequest(url)
+        request.setValue("application/octet-stream", forHTTPHeaderField: "Accept")
+        let (temp, response) = try await session.download(for: request, delegate: StripAuthOnRedirect())
+        if let http = response as? HTTPURLResponse, !(200..<300).contains(http.statusCode) {
+            throw GitHubError.http(http.statusCode, "téléchargement de \(url.lastPathComponent)")
+        }
+        let destination = FileManager.default.temporaryDirectory.appendingPathComponent("MyGitApp-\(UUID().uuidString).zip")
+        try FileManager.default.moveItem(at: temp, to: destination)
+        return destination
+    }
+
     func restSend(_ method: String, _ path: String) async throws {
         var request = makeRequest(Self.api.appendingPathComponent(path))
         request.httpMethod = method
@@ -132,6 +145,19 @@ final class GitHubClient: @unchecked Sendable {
     private static func message(from data: Data) -> String {
         struct M: Decodable { var message: String }
         return (try? JSONDecoder().decode(M.self, from: data).message) ?? String(decoding: data.prefix(200), as: UTF8.self)
+    }
+}
+
+/// Asset downloads redirect to a pre-signed storage URL that rejects a second credential.
+private final class StripAuthOnRedirect: NSObject, URLSessionTaskDelegate {
+    func urlSession(_ session: URLSession, task: URLSessionTask, willPerformHTTPRedirection response: HTTPURLResponse,
+                    newRequest request: URLRequest) async -> URLRequest? {
+        var request = request
+        if request.url?.host != task.originalRequest?.url?.host {
+            request.setValue(nil, forHTTPHeaderField: "Authorization")
+            request.setValue(nil, forHTTPHeaderField: "Content-Type")
+        }
+        return request
     }
 }
 

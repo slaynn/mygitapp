@@ -26,12 +26,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { true }
+
+    func applicationWillTerminate(_ notification: Notification) {
+        MainActor.assumeIsolated { Updater.shared.installOnQuit() }
+    }
 }
 
 struct AppCommands: Commands {
     let app: AppState
 
     var body: some Commands {
+        CommandGroup(after: .appInfo) {
+            Button("Rechercher des mises à jour…") {
+                Task { await Updater.shared.check(app.client, manual: true) }
+            }
+        }
         CommandGroup(after: .toolbar) {
             Button("Rafraîchir") { app.refresh() }
                 .keyboardShortcut("r")
@@ -74,10 +83,15 @@ struct RootView: View {
         }
         .background(Theme.background)
         .task { await app.start() }
-        .task(id: app.auth) { if app.auth == .signedIn { await DebugHooks.run(app) } }
+        .task(id: app.auth) {
+            guard app.auth == .signedIn else { return }
+            Updater.shared.checkIfDue(app.client)
+            await DebugHooks.run(app)
+        }
         .task {
             // Refresh the visible screen every minute while the app is frontmost.
             while !Task.isCancelled {
+                if app.auth == .signedIn { Updater.shared.checkIfDue(app.client) }
                 try? await Task.sleep(for: .seconds(60))
                 if NSApp.isActive, app.auth == .signedIn { app.refresh() }
             }

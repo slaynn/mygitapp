@@ -65,6 +65,7 @@ struct SidebarView: View {
 
     private var footer: some View {
         VStack(alignment: .leading, spacing: 6) {
+            UpdateBanner()
             if let error = app.sidebarError {
                 Text(error).font(.caption).foregroundStyle(Theme.yellow).lineLimit(2)
             }
@@ -72,6 +73,7 @@ struct SidebarView: View {
                 HStack(spacing: 6) {
                     Circle().fill(app.sidebarError == nil ? Theme.green : Theme.yellow).frame(width: 6, height: 6)
                     Text(syncText).font(.system(size: 11)).foregroundStyle(.secondary)
+                        .help("MyGitApp \(Updater.shared.currentVersion)")
                     Spacer()
                     Button { app.isManageReposOpen = true } label: { Image(systemName: "plus") }
                         .buttonStyle(.plain)
@@ -116,6 +118,30 @@ struct SidebarView: View {
         Button("Retirer de la sidebar", role: .destructive) {
             if app.selection == .repo(repo.nameWithOwner) { app.selection = .home }
             app.store.remove(repo.nameWithOwner)
+        }
+    }
+}
+
+/// Appears once a newer release is downloaded and verified.
+private struct UpdateBanner: View {
+    private var updater: Updater { .shared }
+
+    var body: some View {
+        switch updater.state {
+        case .downloading(let version):
+            HStack(spacing: 6) {
+                ProgressView().controlSize(.mini)
+                Text("Téléchargement de la \(version)…").font(.system(size: 11)).foregroundStyle(.secondary)
+            }
+        case .ready(let version):
+            Button { updater.installAndRelaunch() } label: {
+                Label("Redémarrer pour passer en \(version)", systemImage: "arrow.down.circle.fill")
+                    .frame(maxWidth: .infinity)
+            }
+            .buttonStyle(.borderedProminent)
+            .help("Sinon, la mise à jour s'installe quand tu quittes l'app.")
+        default:
+            EmptyView()
         }
     }
 }

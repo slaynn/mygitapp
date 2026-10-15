@@ -44,8 +44,14 @@ Le job tourne sur le runner self-hosted du Mac mini (`~/ci/mygitapp/runner`, ser
 `actions.runner.slaynn-mygitapp.mac-mini-m1-mygitapp`) : aucune minute GitHub consommée. Si le Mac mini est
 éteint, le job attend dans la file jusqu'à son retour.
 
+L'app installée dans `/Applications` se met à jour seule : au lancement puis toutes les 4 h, elle vérifie la
+dernière release, la télécharge et la vérifie en arrière-plan, puis propose « Redémarrer pour passer en X.Y.N »
+en bas de la sidebar (sinon la mise à jour s'applique en quittant l'app). Menu MyGitApp → « Rechercher des mises
+à jour… » pour forcer la vérification. Téléchargée par l'app elle-même, la mise à jour n'est pas mise en
+quarantaine : pas d'alerte Gatekeeper.
+
 ```sh
-make update    # installe la dernière release dans /Applications (sans compiler)
+make update    # installe la dernière release dans /Applications (premier install, ou sans attendre)
 ```
 
 L'app n'est pas signée avec un certificat Apple : `make update` télécharge via `gh`, ce qui évite la
