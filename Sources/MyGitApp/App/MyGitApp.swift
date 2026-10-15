@@ -134,6 +134,9 @@ struct MainView: View {
             }
             .id(app.selection)
         }
+        // The system's title bar band cut the columns a few points left of the sidebar's edge, so the sidebar
+        // seemed to jog under the title. Without it, each column's own background runs up to the top.
+        .toolbarBackground(.hidden, for: .windowToolbar)
         .sheet(isPresented: $app.isManageReposOpen) { ManageReposSheet() }
         .sheet(isPresented: $app.isCommandPaletteOpen) { CommandPalette() }
         .sheet(item: $app.newPullRequest) { NewPullRequestSheet(request: $0) }
