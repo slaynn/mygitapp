@@ -6,7 +6,6 @@ struct CommandPalette: View {
     @Environment(\.dismiss) private var dismiss
     @State private var query = ""
     @State private var selected = 0
-    @FocusState private var focused: Bool
 
     private struct Item: Identifiable {
         var id: String
@@ -21,14 +20,13 @@ struct CommandPalette: View {
         VStack(spacing: 0) {
             HStack(spacing: 10) {
                 Image(systemName: "magnifyingglass").foregroundStyle(.secondary)
-                TextField("Repo, PR, numéro…", text: $query)
-                    .textFieldStyle(.plain)
-                    .font(.system(size: 16))
-                    .focused($focused)
-                    .onSubmit { activate(results) }
-                    .onKeyPress(.downArrow) { selected = min(selected + 1, max(0, results.count - 1)); return .handled }
-                    .onKeyPress(.upArrow) { selected = max(selected - 1, 0); return .handled }
-                    .onKeyPress(.escape) { dismiss(); return .handled }
+                KeySearchField(text: $query, placeholder: "Repo, PR, numéro…", fontSize: 16) { step in
+                    selected = min(max(selected + step, 0), max(0, results.count - 1))
+                } onSubmit: {
+                    activate(results)
+                } onCancel: {
+                    dismiss()
+                }
             }
             .padding(14)
             Divider()
@@ -54,20 +52,22 @@ struct CommandPalette: View {
                                 .contentShape(Rectangle())
                             }
                             .buttonStyle(.plain)
-                            .id(index)
                         }
                         if results.isEmpty {
                             Text("Aucun résultat").foregroundStyle(.secondary).padding(20)
                         }
                     }
                 }
-                .onChange(of: selected) { _, new in proxy.scrollTo(new) }
+                .onChange(of: selected) { _, index in
+                    // Rows are identified by item only: an extra `.id(index)` kept showing stale rows after filtering.
+                    let results = items
+                    if results.indices.contains(index) { proxy.scrollTo(results[index].id) }
+                }
             }
         }
         .frame(width: 560, height: 420)
         .background(Theme.panel)
         .dismissOnOutsideClick(dismiss)
-        .onAppear { focused = true }
         .onChange(of: query) { selected = 0 }
     }
 
