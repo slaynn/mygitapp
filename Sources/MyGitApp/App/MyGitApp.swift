@@ -5,16 +5,17 @@ import SwiftUI
 struct MyGitApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var delegate
     @State private var app = AppState()
+    @AppStorage("appearance") private var appearance = Appearance.system
 
     var body: some Scene {
         WindowGroup("MyGitApp") {
             RootView()
                 .environment(app)
-                .preferredColorScheme(.dark)
                 .frame(minWidth: 980, minHeight: 620)
+                .onChange(of: appearance, initial: true) { appearance.apply() }
         }
         .defaultSize(width: 1280, height: 820)
-        .commands { AppCommands(app: app) }
+        .commands { AppCommands(app: app, appearance: $appearance) }
     }
 }
 
@@ -34,6 +35,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
 struct AppCommands: Commands {
     let app: AppState
+    @Binding var appearance: Appearance
 
     var body: some Commands {
         CommandGroup(after: .appInfo) {
@@ -44,6 +46,9 @@ struct AppCommands: Commands {
         CommandGroup(after: .toolbar) {
             Button("Rafraîchir") { app.refresh() }
                 .keyboardShortcut("r")
+            Picker("Apparence", selection: $appearance) {
+                ForEach(Appearance.allCases) { Text($0.title).tag($0) }
+            }
         }
         CommandMenu("Aller") {
             Button("Rechercher un repo ou une PR…") { app.isCommandPaletteOpen = true }

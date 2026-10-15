@@ -24,8 +24,12 @@ struct SidebarView: View {
 
             if app.store.pinned.isEmpty {
                 Section("Repos") {
-                    Button("Ajouter des repos…") { app.isManageReposOpen = true }
-                        .buttonStyle(.link)
+                    Button { app.isManageReposOpen = true } label: {
+                        Label("Ajouter des repos…", systemImage: "plus.circle")
+                            .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .foregroundStyle(.secondary)
                 }
             }
 

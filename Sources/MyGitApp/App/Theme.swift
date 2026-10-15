@@ -1,21 +1,26 @@
+import AppKit
 import MarkdownUI
 import SwiftUI
 
-/// Dark palette matching the reference screenshot.
+/// Palette for both appearances: dark matches the reference screenshot, light follows GitHub's light theme.
 enum Theme {
-    static let background = Color(hex: 0x111113)
-    static let panel = Color(hex: 0x17181B)
-    static let raised = Color(hex: 0x1D1E22)
-    static let border = Color.white.opacity(0.08)
-    static let hover = Color.white.opacity(0.04)
+    static let background = Color.adaptive(light: 0xFFFFFF, dark: 0x111113)
+    static let panel = Color.adaptive(light: 0xF6F8FA, dark: 0x17181B)
+    static let raised = Color.adaptive(light: 0xEFF2F5, dark: 0x1D1E22)
+    static let border = Color.adaptive(light: Color.black.opacity(0.11), dark: Color.white.opacity(0.08))
+    static let hover = Color.adaptive(light: Color.black.opacity(0.04), dark: Color.white.opacity(0.04))
+    /// Subtle fill for placeholders, counters and selected tabs.
+    static let fill = Color.adaptive(light: Color.black.opacity(0.06), dark: Color.white.opacity(0.08))
+    /// Text drawn on a filled accent color.
+    static let onAccent = Color.adaptive(light: Color.white, dark: Color.black.opacity(0.85))
 
-    static let green = Color(hex: 0x3FB950)
-    static let red = Color(hex: 0xF85149)
-    static let yellow = Color(hex: 0xD29922)
-    static let orange = Color(hex: 0xE8A33D)
-    static let purple = Color(hex: 0xA371F7)
-    static let blue = Color(hex: 0x58A6FF)
-    static let gray = Color(hex: 0x8B949E)
+    static let green = Color.adaptive(light: 0x1A7F37, dark: 0x3FB950)
+    static let red = Color.adaptive(light: 0xCF222E, dark: 0xF85149)
+    static let yellow = Color.adaptive(light: 0x9A6700, dark: 0xD29922)
+    static let orange = Color.adaptive(light: 0xBC4C00, dark: 0xE8A33D)
+    static let purple = Color.adaptive(light: 0x8250DF, dark: 0xA371F7)
+    static let blue = Color.adaptive(light: 0x0969DA, dark: 0x58A6FF)
+    static let gray = Color.adaptive(light: 0x59636E, dark: 0x8B949E)
 
     static let mono = Font.system(size: 12, design: .monospaced)
     static let monoSmall = Font.system(size: 11, design: .monospaced)
@@ -39,10 +44,44 @@ extension Color {
                   opacity: opacity)
     }
 
+    /// Resolves to `light` or `dark` with the view's appearance.
+    static func adaptive(light: Color, dark: Color) -> Color {
+        Color(nsColor: NSColor(name: nil) { appearance in
+            NSColor(appearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua ? dark : light)
+        })
+    }
+
+    static func adaptive(light: UInt32, dark: UInt32) -> Color {
+        adaptive(light: Color(hex: light), dark: Color(hex: dark))
+    }
+
     /// `#3178c6` → Color
     init?(hexString: String?) {
         guard let hexString, let value = UInt32(hexString.trimmingCharacters(in: CharacterSet(charactersIn: "#")), radix: 16) else { return nil }
         self.init(hex: value)
+    }
+}
+
+/// Window appearance, chosen in the View menu.
+enum Appearance: String, CaseIterable, Identifiable {
+    case system, light, dark
+
+    var id: Self { self }
+
+    var title: String {
+        switch self {
+        case .system: "Système"
+        case .light: "Clair"
+        case .dark: "Sombre"
+        }
+    }
+
+    @MainActor func apply() {
+        NSApp.appearance = switch self {
+        case .system: nil
+        case .light: NSAppearance(named: .aqua)
+        case .dark: NSAppearance(named: .darkAqua)
+        }
     }
 }
 
@@ -72,7 +111,7 @@ extension MarkdownUI.Theme {
         .code {
             FontFamilyVariant(.monospaced)
             FontSize(.em(0.88))
-            BackgroundColor(Color.white.opacity(0.08))
+            BackgroundColor(Theme.fill)
         }
         .heading1 { configuration in
             configuration.label
