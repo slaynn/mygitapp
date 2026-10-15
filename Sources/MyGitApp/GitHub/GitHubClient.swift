@@ -85,6 +85,18 @@ final class GitHubClient: @unchecked Sendable {
         if let errors = response.errors, !errors.isEmpty { throw GitHubError.graphQL(errors.map(\.message)) }
     }
 
+    /// Mutation whose payload is needed; any GraphQL error is surfaced.
+    func mutate<T: Decodable>(_ query: String, _ variables: [String: Any?], as: T.Type) async throws -> T {
+        var request = makeRequest(Self.api.appendingPathComponent("graphql"))
+        request.httpMethod = "POST"
+        request.httpBody = try JSONSerialization.data(withJSONObject: ["query": query, "variables": variables.compactMapValues { $0 }])
+        let data = try await send(request)
+        let response = try JSONDecoder.github.decode(GraphQLResponse<T>.self, from: data)
+        if let errors = response.errors, !errors.isEmpty { throw GitHubError.graphQL(errors.map(\.message)) }
+        guard let value = response.data else { throw GitHubError.graphQL(["Réponse vide de GitHub."]) }
+        return value
+    }
+
     // MARK: REST
 
     func rest<T: Decodable>(_ path: String, query: [String: String] = [:], as: T.Type = T.self) async throws -> T {
@@ -246,6 +258,56 @@ extension GitHubClient {
         var map: [String: RepoSummary] = [:]
         for summary in result.values.compactMap({ $0 }) { map[summary.nameWithOwner.lowercased()] = summary }
         return map
+    }
+
+    func newPullRequestContext(_ nameWithOwner: String) async throws -> NewPRContext {
+        struct R: Decodable {
+            struct Repo: Decodable {
+                struct Ref: Decodable {
+                    struct Target: Decodable {
+                        struct Author: Decodable { struct User: Decodable { var login: String }; var user: User? }
+                        var committedDate: Date?
+                        var messageHeadline: String?
+                        var author: Author?
+                    }
+                    struct PRs: Decodable { struct PR: Decodable { var number: Int; var state: String }; var nodes: [PR] }
+                    var name: String
+                    var target: Target?
+                    var associatedPullRequests: PRs
+                }
+                struct Template: Decodable { var body: String? }
+                struct Default: Decodable { var name: String }
+                struct Refs: Decodable { var nodes: [Ref] }
+                var id: String
+                var defaultBranchRef: Default?
+                var pullRequestTemplates: [Template]?
+                var refs: Refs?
+            }
+            var repository: Repo?
+        }
+        let (owner, name) = try split(nameWithOwner)
+        guard let repo = try await graphql(Queries.newPullRequestContext, ["owner": owner, "name": name], as: R.self).repository else {
+            throw GitHubError.notFound
+        }
+        let branches = (repo.refs?.nodes ?? []).map { ref in
+            let pr = ref.associatedPullRequests.nodes.first
+            return NewPRContext.Branch(name: ref.name, committedDate: ref.target?.committedDate, headline: ref.target?.messageHeadline,
+                                       authorLogin: ref.target?.author?.user?.login,
+                                       openPR: pr?.state == "OPEN" ? pr?.number : nil, hasPR: pr != nil)
+        }
+        let template = repo.pullRequestTemplates?.lazy.compactMap(\.body).first { !$0.isEmpty }
+        return NewPRContext(repositoryId: repo.id, defaultBranch: repo.defaultBranchRef?.name, template: template, branches: branches)
+    }
+
+    func compare(_ nameWithOwner: String, base: String, head: String) async throws -> BranchComparison {
+        try await rest("repos/\(nameWithOwner)/compare/\(base)...\(head)")
+    }
+
+    /// Returns the new PR's number.
+    func createPullRequest(repositoryId: String, base: String, head: String, title: String, body: String, draft: Bool) async throws -> Int {
+        struct R: Decodable { struct Payload: Decodable { struct PR: Decodable { var number: Int }; var pullRequest: PR }; var createPullRequest: Payload }
+        let variables: [String: Any?] = ["repo": repositoryId, "base": base, "head": head, "title": title, "body": body, "draft": draft]
+        return try await mutate(Queries.createPullRequest, variables, as: R.self).createPullRequest.pullRequest.number
     }
 
     func contributors(_ nameWithOwner: String) async throws -> [Contributor] {

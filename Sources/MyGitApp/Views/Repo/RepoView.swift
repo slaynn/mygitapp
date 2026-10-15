@@ -8,6 +8,7 @@ struct RepoView: View {
     @State private var overview = Loader<RepoOverview>()
     @State private var stars = Loader<[Date]>()
     @State private var contributors = Loader<[Contributor]>()
+    @State private var prContext: NewPRContext?
     @State private var tab = Tab.overview
     @State private var starring = false
 
@@ -25,6 +26,7 @@ struct RepoView: View {
                         ErrorBanner(message: error).padding([.horizontal, .top], 24)
                     }
                     if let repo = overview.value {
+                        RecentBranchesBanner(repo: nameWithOwner, context: prContext)
                         switch tab {
                         case .overview: overviewContent(repo)
                         case .pulls: RepoPullsTab(repo: repo)
@@ -40,7 +42,10 @@ struct RepoView: View {
         .prefetching(overview.value?.pullRequests.nodes ?? [])
         .task(id: LoadKey(name: nameWithOwner, tick: app.refreshTick)) {
             guard let client = app.client else { return }
-            await overview.load("repo-\(nameWithOwner)") { try await client.repoOverview(nameWithOwner) }
+            async let o: Void = overview.load("repo-\(nameWithOwner)") { try await client.repoOverview(nameWithOwner) }
+            async let b = try? client.newPullRequestContext(nameWithOwner)
+            _ = await o
+            prContext = await b
         }
         .task(id: nameWithOwner) {
             guard let client = app.client else { return }
@@ -68,6 +73,11 @@ struct RepoView: View {
             }
             Spacer()
             if overview.isLoading { ProgressView().controlSize(.small) }
+            Button { app.startNewPullRequest(repo: nameWithOwner) } label: {
+                Label("Nouvelle PR", systemImage: "plus")
+            }
+            .buttonStyle(.borderedProminent)
+            .help("Créer une pull request (⌘N)")
             Link(destination: URL(string: "https://github.com/\(nameWithOwner)")!) {
                 Label("Open on GitHub", systemImage: "arrow.up.right")
             }
@@ -138,6 +148,52 @@ struct RepoView: View {
                 overview.error = error.localizedDescription
             }
             starring = false
+        }
+    }
+}
+
+/// "feat/x had recent pushes": one click to open its pull request, like on GitHub.
+private struct RecentBranchesBanner: View {
+    @Environment(AppState.self) private var app
+    var repo: String
+    var context: NewPRContext?
+
+    private var branches: [NewPRContext.Branch] {
+        guard let context else { return [] }
+        let cutoff = Date.now.addingTimeInterval(-3 * 86_400)
+        return context.branches.filter {
+            $0.name != context.defaultBranch && !$0.hasPR && $0.isProbablyMine(app.viewer?.login)
+                && ($0.committedDate ?? .distantPast) > cutoff
+        }
+        .prefix(3)
+        .map { $0 }
+    }
+
+    var body: some View {
+        if !branches.isEmpty {
+            VStack(spacing: 6) {
+                ForEach(branches) { branch in
+                    HStack(spacing: 10) {
+                        Image(systemName: "arrow.triangle.branch").foregroundStyle(Theme.yellow)
+                        Text(branch.name).font(Theme.mono).fontWeight(.medium)
+                        if let date = branch.committedDate {
+                            Text("dernier commit il y a \(date.shortAgo)").font(.callout).foregroundStyle(.secondary)
+                        }
+                        if let headline = branch.headline {
+                            Text("· \(headline)").font(.callout).foregroundStyle(.secondary).lineLimit(1)
+                        }
+                        Spacer()
+                        Button("Créer une PR") { app.startNewPullRequest(repo: repo, head: branch.name) }
+                            .buttonStyle(.borderedProminent)
+                            .tint(Theme.green)
+                    }
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 8)
+                    .background(Theme.yellow.opacity(0.08), in: RoundedRectangle(cornerRadius: 8))
+                    .overlay(RoundedRectangle(cornerRadius: 8).stroke(Theme.yellow.opacity(0.25)))
+                }
+            }
+            .padding([.horizontal, .top], 24)
         }
     }
 }

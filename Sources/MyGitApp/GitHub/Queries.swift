@@ -212,6 +212,33 @@ enum Queries {
     }
     """
 
+    /// What the "new pull request" form needs: branches (most recent first) with their open PR, and the PR template.
+    static let newPullRequestContext = """
+    query($owner: String!, $name: String!) {
+      repository(owner: $owner, name: $name) {
+        id
+        defaultBranchRef { name }
+        pullRequestTemplates { body }
+        refs(refPrefix: "refs/heads/", first: 100, orderBy: { field: TAG_COMMIT_DATE, direction: DESC }) {
+          nodes {
+            name
+            target { ... on Commit { committedDate messageHeadline author { user { login } } } }
+            associatedPullRequests(first: 1, orderBy: { field: CREATED_AT, direction: DESC }) { nodes { number state } }
+          }
+        }
+      }
+    }
+    """
+
+    static let createPullRequest = """
+    mutation($repo: ID!, $base: String!, $head: String!, $title: String!, $body: String, $draft: Boolean) {
+      createPullRequest(input: { repositoryId: $repo, baseRefName: $base, headRefName: $head,
+                                 title: $title, body: $body, draft: $draft }) {
+        pullRequest { number }
+      }
+    }
+    """
+
     static let addStar = """
     mutation($id: ID!) { addStar(input: { starrableId: $id }) { starrable { stargazerCount } } }
     """

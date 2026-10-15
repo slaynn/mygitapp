@@ -12,6 +12,13 @@ enum Route: Hashable {
     case repo(String)
 }
 
+/// Opens the "new pull request" sheet, optionally on a given repo and head branch.
+struct NewPRRequest: Identifiable, Hashable {
+    var id = UUID()
+    var repo: String?
+    var head: String?
+}
+
 @MainActor @Observable
 final class AppState {
     enum AuthState: Equatable {
@@ -46,6 +53,7 @@ final class AppState {
 
     var isCommandPaletteOpen = false
     var isManageReposOpen = false
+    var newPullRequest: NewPRRequest?
 
     // MARK: Auth
 
@@ -143,6 +151,28 @@ final class AppState {
         } else {
             path.append(.repo(nameWithOwner))
         }
+    }
+
+    /// Repo of the screen on display, if any.
+    var currentRepo: String? {
+        switch path.last {
+        case .repo(let name): return name
+        case .pullRequest(let ref): return ref.nameWithOwner
+        case nil: break
+        }
+        if case .repo(let name) = selection { return name }
+        return nil
+    }
+
+    /// Defaults to the repo on screen, then the first pinned repo.
+    func startNewPullRequest(repo: String? = nil, head: String? = nil) {
+        newPullRequest = NewPRRequest(repo: repo ?? currentRepo ?? store.ordered.first?.nameWithOwner, head: head)
+    }
+
+    func didCreatePullRequest(_ ref: PRRef) {
+        open(ref)
+        Task { await refreshSidebar() }
+        refreshTick += 1
     }
 
     func markRead(_ notification: GHNotification) {
