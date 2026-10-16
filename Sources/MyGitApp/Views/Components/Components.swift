@@ -417,6 +417,38 @@ enum Pasteboard {
 }
 
 /// Text briefly replaced by "Copié" after an action.
+/// Open / closed switch shared by the PR lists. Closed includes merged.
+struct PRStatePicker: View {
+    @Binding var showClosed: Bool
+    var body: some View {
+        Picker("", selection: $showClosed) {
+            Text("Ouvertes").tag(false)
+            Text("Fermées").tag(true)
+        }
+        .pickerStyle(.segmented)
+        .frame(width: 180)
+    }
+}
+
+/// Last row of a paginated PR list.
+struct LoadMoreRow: View {
+    var pager: PRPager
+
+    var body: some View {
+        if let page = pager.page, pager.hasMore {
+            HStack(spacing: 8) {
+                Button("Charger plus") { pager.loadMore() }
+                    .buttonStyle(.link)
+                    .disabled(pager.loadingMore)
+                if pager.loadingMore { ProgressView().controlSize(.mini) }
+                Text("\(page.nodes.count) sur \(page.totalCount)").font(.callout).foregroundStyle(.secondary)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(12)
+        }
+    }
+}
+
 struct CopyButton: View {
     var label: String
     var systemImage: String = "doc.on.doc"

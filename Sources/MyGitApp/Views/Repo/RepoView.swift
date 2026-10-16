@@ -201,32 +201,54 @@ private struct RecentBranchesBanner: View {
 private struct RepoPullsTab: View {
     @Environment(AppState.self) private var app
     var repo: RepoOverview
+    @State private var showClosed = false
     @State private var onlyMine = false
+    @State private var closed = PRPager()
+
+    private struct ClosedKey: Hashable { var name: String; var tick: Int }
 
     var body: some View {
-        let prs = repo.pullRequests.nodes.filter { !onlyMine || $0.author?.login == app.viewer?.login }
+        let source = showClosed ? closed.page?.nodes ?? [] : repo.pullRequests.nodes
+        let prs = source.filter { !onlyMine || $0.author?.login == app.viewer?.login }
         VStack(alignment: .leading, spacing: 0) {
-            HStack {
+            HStack(spacing: 12) {
+                PRStatePicker(showClosed: $showClosed)
                 Picker("", selection: $onlyMine) {
                     Text("Toutes").tag(false)
                     Text("Les miennes").tag(true)
                 }
                 .pickerStyle(.segmented)
                 .frame(width: 200)
+                if showClosed && closed.first.isLoading { ProgressView().controlSize(.small) }
                 Spacer()
-                ExternalLink(title: "All on GitHub", url: repo.url.appendingPathComponent("pulls"))
+                ExternalLink(title: "All on GitHub",
+                             url: repo.url.appendingPathComponent("pulls").appending(queryItems: [
+                                 URLQueryItem(name: "q", value: showClosed ? "is:pr is:closed" : "is:pr is:open"),
+                             ]))
             }
             .padding(16)
+            if showClosed, let error = closed.first.error {
+                ErrorBanner(message: error).padding([.horizontal, .bottom], 16)
+            }
             VStack(spacing: 0) {
-                if prs.isEmpty { EmptyStateText(text: "Aucune PR ouverte.") }
+                if prs.isEmpty && !(showClosed && closed.page == nil) {
+                    EmptyStateText(text: showClosed ? "Aucune PR fermée." : "Aucune PR ouverte.")
+                }
                 ForEach(prs) { pr in
                     PRRowView(pr: pr)
                     if pr.id != prs.last?.id { Divider().opacity(0.4) }
                 }
+                if showClosed { LoadMoreRow(pager: closed) }
             }
             .card()
             .padding(.horizontal, 16)
             .padding(.bottom, 16)
+        }
+        .prefetching(showClosed ? prs : [])
+        .task(id: showClosed ? ClosedKey(name: repo.nameWithOwner, tick: app.refreshTick) : nil) {
+            guard showClosed, let client = app.client else { return }
+            let name = repo.nameWithOwner
+            await closed.load("closed-prs-\(name)") { try await client.closedPullRequests(name, after: $0) }
         }
     }
 }

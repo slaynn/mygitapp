@@ -72,6 +72,19 @@ enum Queries {
     }
     """ + prSummaryFragment
 
+    /// Merged and closed PRs, most recently updated first.
+    static let closedPullRequests = """
+    query($owner: String!, $name: String!, $after: String) {
+      repository(owner: $owner, name: $name) {
+        pullRequests(states: [MERGED, CLOSED], first: 50, after: $after, orderBy: { field: UPDATED_AT, direction: DESC }) {
+          totalCount
+          pageInfo { hasNextPage endCursor }
+          nodes { ...PRSummary }
+        }
+      }
+    }
+    """ + prSummaryFragment
+
     static let stargazers = """
     query($owner: String!, $name: String!, $after: String) {
       repository(owner: $owner, name: $name) {
@@ -159,6 +172,16 @@ enum Queries {
     query($q: String!) {
       search(query: $q, type: ISSUE, first: 100) {
         issueCount
+        nodes { ...PRSummary }
+      }
+    }
+    """ + prSummaryFragment
+
+    static let searchPullRequestPage = """
+    query($q: String!, $after: String) {
+      search(query: $q, type: ISSUE, first: 50, after: $after) {
+        totalCount: issueCount
+        pageInfo { hasNextPage endCursor }
         nodes { ...PRSummary }
       }
     }

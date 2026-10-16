@@ -148,10 +148,15 @@ struct MainView: View {
         case .inbox: InboxView()
         case .pullRequests:
             PRSearchListView(title: "Mes pull requests", prs: app.visibleMyPRs,
-                             empty: "Aucune PR ouverte de ta part sur tes repos épinglés.")
+                             empty: "Aucune PR ouverte de ta part sur tes repos épinglés.",
+                             closedQuery: "is:pr is:closed archived:false author:@me sort:updated-desc",
+                             closedEmpty: "Aucune PR fermée de ta part.")
         case .reviewRequests:
             PRSearchListView(title: "Review requests", prs: app.visibleReviewRequests,
-                             empty: "Personne n'attend ta review.")
+                             empty: "Personne n'attend ta review.",
+                             // GitHub drops the review request once the review is in, so "closed" means reviewed.
+                             closedQuery: "is:pr is:closed archived:false reviewed-by:@me -author:@me sort:updated-desc",
+                             closedEmpty: "Aucune PR fermée que tu as reviewée.")
         case .repo(let name): RepoView(nameWithOwner: name)
         }
     }
