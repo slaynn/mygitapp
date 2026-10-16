@@ -36,21 +36,51 @@ struct PageHeader<Trailing: View>: View {
 }
 
 struct PRSearchListView: View {
+    @Environment(AppState.self) private var app
     var title: String
     var prs: [PRSummary]
     var empty: String
+    /// GitHub search for the closed counterpart of the list, merged included.
+    var closedQuery: String
+    var closedEmpty: String
+
+    @State private var showClosed = false
+    @State private var closed = PRPager()
+
+    private struct ClosedKey: Hashable { var query: String; var tick: Int }
 
     var body: some View {
+        let closedPRs = app.filter(closed.page?.nodes ?? [])
         ScrollView {
             VStack(alignment: .leading, spacing: 0) {
-                PageHeader(title: title, subtitle: "\(prs.count) ouverte(s)") { ScopeToggle() }
-                PRList(prs: prs, empty: empty)
-                    .padding(.horizontal, 24)
-                    .padding(.bottom, 24)
+                PageHeader(title: title, subtitle: showClosed ? "\(closedPRs.count) fermée(s)" : "\(prs.count) ouverte(s)") {
+                    HStack(spacing: 12) {
+                        if showClosed && closed.first.isLoading { ProgressView().controlSize(.small) }
+                        PRStatePicker(showClosed: $showClosed)
+                        ScopeToggle()
+                    }
+                }
+                if showClosed, let error = closed.first.error {
+                    ErrorBanner(message: error).padding([.horizontal, .bottom], 24)
+                }
+                Group {
+                    if showClosed {
+                        PRList(prs: closedPRs, empty: closed.page == nil ? "" : closedEmpty, pager: closed)
+                    } else {
+                        PRList(prs: prs, empty: empty)
+                    }
+                }
+                .padding(.horizontal, 24)
+                .padding(.bottom, 24)
             }
         }
         .background(Theme.background)
         .navigationTitle(title)
+        .task(id: showClosed ? ClosedKey(query: closedQuery, tick: app.refreshTick) : nil) {
+            guard showClosed, let client = app.client else { return }
+            let query = closedQuery
+            await closed.load("search-\(query)") { try await client.searchPullRequests(query, after: $0) }
+        }
     }
 }
 
@@ -59,14 +89,19 @@ struct PRList: View {
     var prs: [PRSummary]
     var empty: String
     var limit: Int?
+    var pager: PRPager?
 
     var body: some View {
         let shown = limit.map { Array(prs.prefix($0)) } ?? prs
         VStack(alignment: .leading, spacing: 0) {
-            if prs.isEmpty { EmptyStateText(text: empty) }
+            if prs.isEmpty && !empty.isEmpty { EmptyStateText(text: empty) }
             ForEach(Array(shown.enumerated()), id: \.element.id) { index, pr in
                 PRRowView(pr: pr, showRepo: true)
                 if index < shown.count - 1 { Divider().opacity(0.4) }
+            }
+            if let pager, pager.hasMore {
+                if !shown.isEmpty { Divider().opacity(0.4) }
+                LoadMoreRow(pager: pager)
             }
         }
         .card()

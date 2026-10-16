@@ -190,6 +190,17 @@ extension GitHubClient {
         return repo
     }
 
+    /// One page of merged and closed PRs; pass the previous page's `endCursor` to get the next one.
+    func closedPullRequests(_ nameWithOwner: String, after cursor: String? = nil) async throws -> PRPage {
+        struct R: Decodable { struct Repo: Decodable { var pullRequests: PRPage }; var repository: Repo? }
+        let (owner, name) = try split(nameWithOwner)
+        guard let repo = try await graphql(Queries.closedPullRequests, ["owner": owner, "name": name, "after": cursor],
+                                           as: R.self).repository else {
+            throw GitHubError.notFound
+        }
+        return repo.pullRequests
+    }
+
     /// Star timestamps within the last `days` days (newest first), capped at `maxPages` pages.
     func recentStars(_ nameWithOwner: String, days: Int = 30, maxPages: Int = 5) async throws -> [Date] {
         struct R: Decodable {
@@ -234,6 +245,12 @@ extension GitHubClient {
     func searchPullRequests(_ query: String) async throws -> [PRSummary] {
         struct R: Decodable { struct S: Decodable { var nodes: [PRSummary] }; var search: S }
         return try await graphql(Queries.searchPullRequests, ["q": query], as: R.self).search.nodes
+    }
+
+    /// One page of a PR search; pass the previous page's `endCursor` to get the next one.
+    func searchPullRequests(_ query: String, after cursor: String?) async throws -> PRPage {
+        struct R: Decodable { var search: PRPage }
+        return try await graphql(Queries.searchPullRequestPage, ["q": query, "after": cursor], as: R.self).search
     }
 
     func viewerRepositories(maxPages: Int = 10) async throws -> [RepoListItem] {

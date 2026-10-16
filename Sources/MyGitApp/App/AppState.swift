@@ -131,7 +131,7 @@ final class AppState {
         showAllRepos ? notifications : notifications.filter { isPinned($0.repository.full_name) }
     }
 
-    private func filter(_ prs: [PRSummary]) -> [PRSummary] {
+    func filter(_ prs: [PRSummary]) -> [PRSummary] {
         showAllRepos ? prs : prs.filter { isPinned($0.repository.nameWithOwner) }
     }
 

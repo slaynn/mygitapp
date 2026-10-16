@@ -113,6 +113,21 @@ struct PRSummary: Codable, Hashable, Identifiable {
     var ci: CIStatus { CIStatus(rollup: commits.nodes.last?.commit.statusCheckRollup?.state) }
 }
 
+/// A paginated slice of a repo's pull requests.
+struct PRPage: Codable, Hashable {
+    var totalCount: Int
+    var pageInfo: PageInfo
+    var nodes: [PRSummary]
+
+    /// Appends the next page, skipping PRs that moved between pages while they were being read.
+    mutating func append(_ next: PRPage) {
+        let known = Set(nodes.map(\.id))
+        nodes += next.nodes.filter { !known.contains($0.id) }
+        pageInfo = next.pageInfo
+        totalCount = next.totalCount
+    }
+}
+
 struct PRDetail: Codable, Hashable {
     var summary: PRSummary
     var extra: PRDetailExtra
