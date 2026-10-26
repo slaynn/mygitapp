@@ -3,7 +3,7 @@ import Foundation
 import Observation
 
 enum SidebarItem: Hashable {
-    case home, inbox, pullRequests, reviewRequests
+    case home, inbox, pullRequests, reviewRequests, garden
     case repo(String)
 }
 
@@ -31,6 +31,9 @@ final class AppState {
     var viewer: Viewer?
     private(set) var client: GitHubClient?
     let store = RepoStore()
+    let garden = GardenStore()
+    /// Local clone shown alone on the local branches screen; nil shows them all.
+    var gardenFocus: URL?
 
     var selection: SidebarItem? = .home {
         didSet { if selection != oldValue { path = [] } }
@@ -167,6 +170,14 @@ final class AppState {
     /// Defaults to the repo on screen, then the first pinned repo.
     func startNewPullRequest(repo: String? = nil, head: String? = nil) {
         newPullRequest = NewPRRequest(repo: repo ?? currentRepo ?? store.ordered.first?.nameWithOwner, head: head)
+    }
+
+    /// Local branches screen, focused on one repo's clone when given.
+    func openGarden(repo nameWithOwner: String? = nil) {
+        gardenFocus = nameWithOwner.flatMap { name in
+            garden.repos.first { $0.nameWithOwner.caseInsensitiveCompare(name) == .orderedSame }?.path
+        }
+        selection = .garden
     }
 
     func didCreatePullRequest(_ ref: PRRef) {

@@ -73,6 +73,13 @@ struct RepoView: View {
             }
             Spacer()
             if overview.isLoading { ProgressView().controlSize(.small) }
+            if app.garden.repos.contains(where: { $0.nameWithOwner.caseInsensitiveCompare(nameWithOwner) == .orderedSame }) {
+                Button { app.openGarden(repo: nameWithOwner) } label: {
+                    Label("Branches locales", systemImage: "leaf")
+                }
+                .buttonStyle(.bordered)
+                .help("Tailler les branches et worktrees du clone local")
+            }
             Button { app.startNewPullRequest(repo: nameWithOwner) } label: {
                 Label("Nouvelle PR", systemImage: "plus")
             }

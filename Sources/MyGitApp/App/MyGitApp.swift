@@ -65,6 +65,8 @@ struct AppCommands: Commands {
                 .keyboardShortcut("0")
             Button("Inbox") { app.selection = .inbox }
                 .keyboardShortcut("i", modifiers: [.command, .shift])
+            Button("Branches locales") { app.openGarden() }
+                .keyboardShortcut("b", modifiers: [.command, .shift])
             Button("Retour") { if !app.path.isEmpty { app.path.removeLast() } }
                 .keyboardShortcut("[")
             Divider()
@@ -140,6 +142,8 @@ struct MainView: View {
         .sheet(isPresented: $app.isManageReposOpen) { ManageReposSheet() }
         .sheet(isPresented: $app.isCommandPaletteOpen) { CommandPalette() }
         .sheet(item: $app.newPullRequest) { NewPullRequestSheet(request: $0) }
+        // Local clones follow the pinned repos; their branches are analyzed in the background.
+        .task(id: app.store.pinned.compactMap(\.localPath)) { await app.garden.sync(with: app.store.pinned) }
     }
 
     @ViewBuilder private var rootDetail: some View {
@@ -157,6 +161,7 @@ struct MainView: View {
                              // GitHub drops the review request once the review is in, so "closed" means reviewed.
                              closedQuery: "is:pr is:closed archived:false reviewed-by:@me -author:@me sort:updated-desc",
                              closedEmpty: "Aucune PR fermée que tu as reviewée.")
+        case .garden: GardenView()
         case .repo(let name): RepoView(nameWithOwner: name)
         }
     }

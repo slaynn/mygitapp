@@ -77,6 +77,7 @@ struct CommandPalette: View {
             Item(id: "inbox", title: "Inbox", subtitle: "Notifications", symbol: "tray") { app.selection = .inbox },
             Item(id: "reviews", title: "Review requests", subtitle: "PRs qui attendent ta review", symbol: "eye") { app.selection = .reviewRequests },
             Item(id: "mine", title: "Mes pull requests", subtitle: "PRs ouvertes par toi", symbol: "arrow.triangle.pull") { app.selection = .pullRequests },
+            Item(id: "garden", title: "Branches locales", subtitle: "Tailler les branches et worktrees des clones", symbol: "leaf") { app.openGarden() },
             Item(id: "new-pr", title: "Nouvelle pull request…", subtitle: "⌘N", symbol: "plus.square") { app.startNewPullRequest() },
             Item(id: "manage", title: "Gérer les repos…", subtitle: "Épingler / retirer", symbol: "plus.circle") { app.isManageReposOpen = true },
         ]
