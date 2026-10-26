@@ -8,6 +8,7 @@ struct PRDetailView: View {
     @AppStorage("hideResolvedThreads") private var hideResolved = true
     @State private var pendingMerge: String?
     @State private var confirmApprove = false
+    @State private var confirmDeleteBranch = false
 
     enum Tab: String, Hashable { case conversation, threads, files, checks }
     private struct LoadKey: Hashable { var ref: PRRef; var tick: Int }
@@ -68,6 +69,12 @@ struct PRDetailView: View {
             Button("Approuver") { Task { await model.approve(app: app) } }
             Button("Annuler", role: .cancel) {}
         }
+        .confirmationDialog("Supprimer la branche \(summary?.headRefName ?? "") ?", isPresented: $confirmDeleteBranch) {
+            Button("Supprimer la branche", role: .destructive) { Task { await model.deleteHeadBranch(app: app) } }
+            Button("Annuler", role: .cancel) {}
+        } message: {
+            Text("Elle pourra être restaurée depuis la conversation.")
+        }
     }
 
     // MARK: Header
@@ -111,7 +118,9 @@ struct PRDetailView: View {
     /// Approve / merge need the detail (authorship, allowed merge methods), so they appear once it loads.
     @ViewBuilder private func actions(_ s: PRSummary, extra: PRDetailExtra?) -> some View {
         HStack(spacing: 8) {
-            if model.busy.contains("approve") || model.busy.contains("merge") { ProgressView().controlSize(.small) }
+            if model.busy.contains("approve") || model.busy.contains("merge") || model.busy.contains("branch") {
+                ProgressView().controlSize(.small)
+            }
             if let extra, s.state == "OPEN" && !extra.viewerDidAuthor {
                 Button { confirmApprove = true } label: { Label("Approuver", systemImage: "checkmark") }
             }
@@ -127,6 +136,10 @@ struct PRDetailView: View {
                 .menuStyle(.borderedButton)
                 .fixedSize()
                 .help(mergeHelp(extra))
+            }
+            if let extra, s.state != "OPEN" && extra.headRef != nil && extra.viewerCanDeleteHeadRef == true {
+                Button { confirmDeleteBranch = true } label: { Label("Supprimer la branche", systemImage: "trash") }
+                    .help("La branche \(s.headRefName) peut être supprimée en toute sécurité")
             }
             Link(destination: s.url) { Label("GitHub", systemImage: "arrow.up.right") }
                 .buttonStyle(.bordered)

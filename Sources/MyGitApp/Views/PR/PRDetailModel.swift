@@ -71,6 +71,23 @@ final class PRDetailModel {
         if ok { app.refresh() }
     }
 
+    /// GitHub's "Delete branch" once the PR is merged or closed.
+    func deleteHeadBranch(app: AppState) async {
+        guard let ref = detail.value?.extra.headRef else { return }
+        _ = await perform("branch", app) { client in
+            try await client.mutate(Queries.deleteRef, ["ref": ref.id])
+        }
+    }
+
+    /// Puts the deleted head branch back at the PR's last commit.
+    func restoreHeadBranch(app: AppState) async {
+        guard let pr = detail.value, let repo = pr.extra.headRepository else { return }
+        _ = await perform("branch", app) { client in
+            try await client.mutate(Queries.restoreRef, ["repo": repo.id, "name": "refs/heads/\(pr.summary.headRefName)",
+                                                         "oid": pr.extra.headRefOid])
+        }
+    }
+
     // MARK: Helpers
 
     private func updateThread(_ id: String, _ change: (inout ReviewThread) -> Void) {

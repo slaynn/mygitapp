@@ -163,6 +163,8 @@ struct PRDetailExtra: Codable, Hashable {
         var requestedReviewer: Reviewer?
     }
 
+    struct NodeID: Codable, Hashable { var id: String }
+
     struct LastCommit: Codable, Hashable {
         struct Commit: Codable, Hashable {
             struct Rollup: Codable, Hashable {
@@ -182,6 +184,12 @@ struct PRDetailExtra: Codable, Hashable {
     var mergeStateStatus: String
     var viewerDidAuthor: Bool
     var viewerCanUpdate: Bool
+    /// Optional so detail caches written before these fields existed still decode.
+    var viewerCanDeleteHeadRef: Bool?
+    /// Nil once the head branch is deleted.
+    var headRef: NodeID?
+    /// Nil when the fork the PR came from was deleted.
+    var headRepository: NodeID?
     var merged: Bool
     var repository: RepoMergeSettings
     var reviewRequests: Nodes<ReviewRequest>
@@ -295,7 +303,8 @@ enum TimelineNode: Codable, Hashable {
         switch type {
         case "IssueComment": self = .comment(try IssueComment(from: decoder))
         case "PullRequestCommit": self = .commit(try c.decode(CommitInfo.self, forKey: .commit))
-        case "HeadRefForcePushedEvent", "MergedEvent", "ClosedEvent", "ReopenedEvent", "ReadyForReviewEvent":
+        case "HeadRefForcePushedEvent", "MergedEvent", "ClosedEvent", "ReopenedEvent", "ReadyForReviewEvent",
+             "HeadRefDeletedEvent", "HeadRefRestoredEvent":
             self = .event(type: type, try SimpleEvent(from: decoder))
         default: self = .unknown(type)
         }

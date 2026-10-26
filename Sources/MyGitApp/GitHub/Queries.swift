@@ -102,7 +102,7 @@ enum Queries {
         pullRequest(number: $number) {
           ...PRSummary
           body headRefOid changedFiles mergeable mergeStateStatus viewerDidAuthor merged
-          viewerCanUpdate
+          viewerCanUpdate viewerCanDeleteHeadRef headRef { id } headRepository { id }
           repository { nameWithOwner mergeCommitAllowed squashMergeAllowed rebaseMergeAllowed }
           reviewRequests(first: 10) {
             nodes { requestedReviewer { __typename ... on User { login avatarUrl } ... on Team { name } ... on Bot { login avatarUrl } } }
@@ -124,7 +124,8 @@ enum Queries {
             }
           }
           timelineItems(first: 100, itemTypes: [ISSUE_COMMENT, PULL_REQUEST_COMMIT, HEAD_REF_FORCE_PUSHED_EVENT,
-                                                 MERGED_EVENT, CLOSED_EVENT, REOPENED_EVENT, READY_FOR_REVIEW_EVENT]) {
+                                                 MERGED_EVENT, CLOSED_EVENT, REOPENED_EVENT, READY_FOR_REVIEW_EVENT,
+                                                 HEAD_REF_DELETED_EVENT, HEAD_REF_RESTORED_EVENT]) {
             nodes {
               __typename
               ... on IssueComment { id author { login avatarUrl } body createdAt url }
@@ -141,6 +142,8 @@ enum Queries {
               ... on ClosedEvent { id createdAt actor { login avatarUrl } }
               ... on ReopenedEvent { id createdAt actor { login avatarUrl } }
               ... on ReadyForReviewEvent { id createdAt actor { login avatarUrl } }
+              ... on HeadRefDeletedEvent { id createdAt actor { login avatarUrl } }
+              ... on HeadRefRestoredEvent { id createdAt actor { login avatarUrl } }
             }
           }
           lastCommit: commits(last: 1) {
@@ -232,6 +235,17 @@ enum Queries {
     static let merge = """
     mutation($pr: ID!, $method: PullRequestMergeMethod!) {
       mergePullRequest(input: { pullRequestId: $pr, mergeMethod: $method }) { pullRequest { id merged } }
+    }
+    """
+
+    static let deleteRef = """
+    mutation($ref: ID!) { deleteRef(input: { refId: $ref }) { clientMutationId } }
+    """
+
+    /// Recreates a deleted head branch at the PR's last commit, like GitHub's "Restore branch".
+    static let restoreRef = """
+    mutation($repo: ID!, $name: String!, $oid: GitObjectID!) {
+      createRef(input: { repositoryId: $repo, name: $name, oid: $oid }) { ref { id } }
     }
     """
 
