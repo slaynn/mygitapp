@@ -23,6 +23,21 @@ Client GitHub natif macOS (SwiftUI), rapide, centré sur les repos que tu choisi
   Si la branche locale n'est pas encore sur GitHub, un bouton la pousse. Les branches poussées récemment sans PR
   s'affichent en haut du repo avec « Créer une PR ».
 - **Home / Pull requests / Review requests / Inbox**, filtrés par défaut sur les repos épinglés.
+- **Branches locales** (⇧⌘B, sidebar, ou bouton « Branches locales » d'un repo ; repris de
+  [GitGardener](https://github.com/geoffroyriou-weqeep/gitgardener)) : pour chaque repo épinglé avec un clone local,
+  ses branches et worktrees, avec leur emplacement (local uniquement, suivie, supprimée sur origin, uniquement sur
+  origin), la PR associée et un verdict : *Sûre* (mergée, squash et rebase compris), *À vérifier* (pas mergée mais
+  tout est sur origin), *Risquée* (commits nulle part ailleurs, ou worktree modifié), *Bloquée* (branche de base,
+  branche extraite dans le dossier principal, workspace Conductor actif, worktree d'un thread T3 Code actif). Les
+  branches de base sont auto-détectées et modifiables par repo.
+  - *T3 Code* : les threads sont lus (lecture seule) dans `~/.t3/userdata/statev2.sqlite`. Le worktree d'un thread
+    actif est bloqué, avec le titre du thread ; celui d'un thread archivé est signalé mais suit son verdict normal.
+    Si la base est illisible, tous les worktrees de `~/.t3/worktrees` sont bloqués par prudence.
+  - *Taille* : sélectionne des branches (ou « Sélectionner les sûres »), puis confirme dans une feuille qui refait
+    un `fetch` et recalcule les verdicts avant de lister ce qui sera détruit (dossiers de worktree, fichiers non
+    commités ou ignorés). Supprimer sur origin est une option explicite ; le risqué demande de taper « supprimer ».
+  - *Journal* : les branches supprimées sont gardées 30 jours et restaurables tant que leurs commits existent.
+  - La logique (lecture, verdicts, taille, journal) vit dans la cible `GitGardenerCore`, sans UI, testée à part.
 
 ## Installation
 

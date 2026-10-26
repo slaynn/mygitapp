@@ -1,13 +1,15 @@
 import AppKit
 
 /// Dev-only automation, inert unless `MYGITAPP_SNAPSHOT` is set:
-///   MYGITAPP_OPEN=owner/repo | owner/repo#12 | inbox | reviews | prs | manage | palette | newpr:owner/repo
+///   MYGITAPP_OPEN=owner/repo | owner/repo#12 | inbox | reviews | prs | garden | manage | palette | newpr:owner/repo
 ///   MYGITAPP_TAB=conversation | threads | files | checks           PR tab
+///   MYGITAPP_VERDICT=safe | review | risky | blocked                verdict filter of the local branches screen
 ///   MYGITAPP_BRANCHES=base | compare [MYGITAPP_QUERY=text]          open a branch search of the new PR sheet
 ///   MYGITAPP_SNAPSHOT=/path/shot.png                               window capture, then quit
 enum DebugHooks {
     static let env = ProcessInfo.processInfo.environment
     static var initialPRTab: String? { env["MYGITAPP_TAB"] }
+    static var initialVerdict: String? { env["MYGITAPP_VERDICT"] }
     static var openBranchField: String? { env["MYGITAPP_BRANCHES"] }
     static var branchQuery: String { env["MYGITAPP_QUERY"] ?? "" }
 
@@ -19,6 +21,7 @@ enum DebugHooks {
             case "inbox": app.selection = .inbox
             case "reviews": app.selection = .reviewRequests
             case "prs": app.selection = .pullRequests
+            case "garden": app.openGarden()
             case "manage": app.isManageReposOpen = true
             case "palette": app.isCommandPaletteOpen = true
             case _ where target.hasPrefix("newpr:"): app.startNewPullRequest(repo: String(target.dropFirst("newpr:".count)))

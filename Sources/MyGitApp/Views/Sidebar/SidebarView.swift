@@ -20,6 +20,10 @@ struct SidebarView: View {
                 Label("Review requests", systemImage: "eye")
                     .badge(app.visibleReviewRequests.count)
                     .tag(SidebarItem.reviewRequests)
+                Label("Branches locales", systemImage: "leaf")
+                    .badge(app.garden.safeCount)
+                    .tag(SidebarItem.garden)
+                    .help("Branches et worktrees des clones locaux, à tailler")
             }
 
             if app.store.pinned.isEmpty {
@@ -117,6 +121,7 @@ struct SidebarView: View {
         if let path = repo.localPath {
             Divider()
             LocalOpenButtons(path: path)
+            Button("Branches locales") { app.openGarden(repo: repo.nameWithOwner) }
         }
         Divider()
         Button("Retirer de la sidebar", role: .destructive) {
