@@ -33,6 +33,13 @@ struct ConversationTab: View {
                     EventLine(type: type, event: event)
                 }
             }
+            // `viewerCanDeleteHeadRef` is only nil in caches older than the field, where a missing `headRef` means nothing.
+            if pr.summary.state != "OPEN" && pr.extra.headRef == nil && pr.extra.headRepository != nil
+                && pr.extra.viewerCanDeleteHeadRef != nil {
+                DeletedBranchBanner(branch: pr.summary.headRefName, busy: model.busy.contains("branch")) {
+                    Task { await model.restoreHeadBranch(app: app) }
+                }
+            }
             if pr.summary.state != "MERGED" {
                 VStack(alignment: .leading, spacing: 8) {
                     Text("Ajouter un commentaire").font(.system(size: 12.5, weight: .semibold))
@@ -44,6 +51,28 @@ struct ConversationTab: View {
                 .padding(.top, 6)
             }
         }
+    }
+}
+
+/// GitHub's end-of-conversation note once the head branch is gone, with its "Restore branch" button.
+private struct DeletedBranchBanner: View {
+    var branch: String
+    var busy: Bool
+    var restore: () -> Void
+
+    var body: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "arrow.triangle.branch").foregroundStyle(.secondary)
+            Text("La branche").foregroundStyle(.secondary)
+            BranchChip(name: branch)
+            Text("a été supprimée.").foregroundStyle(.secondary)
+            Spacer()
+            if busy { ProgressView().controlSize(.small) }
+            Button("Restaurer la branche", action: restore).disabled(busy)
+        }
+        .font(.system(size: 12))
+        .card(padding: 12)
+        .padding(.top, 6)
     }
 }
 
@@ -237,6 +266,8 @@ struct EventLine: View {
         case "ClosedEvent": "a fermé la PR"
         case "ReopenedEvent": "a rouvert la PR"
         case "ReadyForReviewEvent": "a marqué la PR prête pour review"
+        case "HeadRefDeletedEvent": "a supprimé la branche"
+        case "HeadRefRestoredEvent": "a restauré la branche"
         case "HeadRefForcePushedEvent":
             "a force-push \(event.beforeCommit?.abbreviatedOid ?? "?") → \(event.afterCommit?.abbreviatedOid ?? "?")"
         default: type
@@ -249,6 +280,8 @@ struct EventLine: View {
         case "ClosedEvent": "xmark.circle"
         case "ReopenedEvent": "arrow.uturn.backward.circle"
         case "HeadRefForcePushedEvent": "arrow.up.forward.circle"
+        case "HeadRefDeletedEvent": "trash"
+        case "HeadRefRestoredEvent": "arrow.triangle.branch"
         default: "eye"
         }
     }
