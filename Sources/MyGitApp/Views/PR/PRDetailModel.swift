@@ -8,6 +8,7 @@ final class PRDetailModel {
     let ref: PRRef
     let detail = Loader<PRDetail>()
     let files = Loader<[PRFile]>()
+    let reviewers = Loader<ReviewerCandidates>()
     var actionError: String?
     var busy: Set<String> = []
 
@@ -86,6 +87,48 @@ final class PRDetailModel {
             try await client.mutate(Queries.restoreRef, ["repo": repo.id, "name": "refs/heads/\(pr.summary.headRefName)",
                                                          "oid": pr.extra.headRefOid])
         }
+    }
+
+    // MARK: Reviewers
+
+    func loadReviewers(_ app: AppState) async {
+        guard let client = app.client else { return }
+        let author = detail.value?.summary.author?.login
+        await reviewers.load("reviewers-\(ref.id)") { [ref] in try await client.reviewerCandidates(ref, author: author) }
+    }
+
+    /// Users matching `text` on GitHub's side, for repos with more users than were loaded.
+    func searchReviewers(_ text: String, app: AppState) async -> [ReviewerCandidate] {
+        guard let client = app.client else { return [] }
+        let author = detail.value?.summary.author?.login
+        return (try? await client.reviewerCandidates(ref, author: author, query: text, maxPages: 1).candidates) ?? []
+    }
+
+    func requestReview(from candidate: ReviewerCandidate, app: AppState) async {
+        guard let pr = detail.value else { return }
+        let reviewer = PRDetailExtra.ReviewRequest.Reviewer(
+            login: candidate.isTeam ? nil : candidate.handle, name: candidate.isTeam ? candidate.name : nil,
+            slug: candidate.isTeam ? candidate.handle : nil, avatarUrl: candidate.avatarUrl)
+        detail.value?.extra.reviewRequests.nodes.append(.init(requestedReviewer: reviewer))
+        let ok = await perform("reviewers", app) { client in
+            try await client.mutate(Queries.requestReviews, ["pr": pr.summary.id,
+                                                             "users": candidate.isTeam ? [] : [candidate.id],
+                                                             "teams": candidate.isTeam ? [candidate.id] : []])
+        }
+        if !ok { detail.value?.extra.reviewRequests.nodes.removeAll { $0.requestedReviewer == reviewer } }
+    }
+
+    /// GraphQL can only add review requests; removing one goes through REST.
+    func removeReviewRequest(_ reviewer: PRDetailExtra.ReviewRequest.Reviewer, app: AppState) async {
+        let removed = detail.value?.extra.reviewRequests.nodes.filter { $0.requestedReviewer == reviewer } ?? []
+        // Teams are removed by slug, which only a detail cache older than the field lacks, until the reload.
+        guard let handle = reviewer.isTeam ? reviewer.slug : reviewer.login else { return }
+        detail.value?.extra.reviewRequests.nodes.removeAll { $0.requestedReviewer == reviewer }
+        let ok = await perform("reviewers", app) { [ref] client in
+            try await client.restSend("DELETE", "repos/\(ref.owner)/\(ref.name)/pulls/\(ref.number)/requested_reviewers",
+                                      body: [reviewer.isTeam ? "team_reviewers" : "reviewers": [handle]])
+        }
+        if !ok { detail.value?.extra.reviewRequests.nodes += removed }
     }
 
     // MARK: Helpers

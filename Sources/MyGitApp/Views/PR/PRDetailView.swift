@@ -102,6 +102,9 @@ struct PRDetailView: View {
                 Spacer()
             }
             .font(.system(size: 12))
+            if let pr = model.detail.value, s.state == "OPEN" || !pr.extra.reviewRequests.nodes.isEmpty {
+                ReviewersField(pr: pr, model: model)
+            }
         }
         .padding(.horizontal, 20)
         .padding(.vertical, 14)
