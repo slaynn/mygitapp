@@ -16,6 +16,8 @@ Client GitHub natif macOS (SwiftUI), rapide, centré sur les repos que tu choisi
   - *Files* : le diff, avec les threads insérés à leur ligne.
   - *Checks* : statut CI du dernier commit.
   - Actions : répondre, résoudre / rouvrir, commenter, approuver, merger (squash / merge / rebase).
+  - *Reviewers* : sous l'en-tête, les reviews en attente (retirables) et « Demander une review », une liste
+    filtrable au clavier des personnes ayant accès au repo (suggestions de GitHub en tête) et des équipes de l'org.
   - **« Pour l'agent »** copie un thread (ou tous les non résolus) en markdown prêt à coller dans Codex / Claude.
 - **Nouvelle PR** (⌘N, bouton « Nouvelle PR » d'un repo, ou palette ⌘K) : la branche est présélectionnée (celle du
   clone local, sinon ta dernière branche sans PR), le titre et la description sont préremplis depuis les commits ou le

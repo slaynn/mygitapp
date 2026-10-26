@@ -157,8 +157,11 @@ struct PRDetailExtra: Codable, Hashable {
         struct Reviewer: Codable, Hashable {
             var login: String?
             var name: String?
+            /// Teams only; nil in detail caches written before it was fetched.
+            var slug: String?
             var avatarUrl: URL?
             var display: String { login ?? name ?? "?" }
+            var isTeam: Bool { login == nil }
         }
         var requestedReviewer: Reviewer?
     }
@@ -528,6 +531,31 @@ struct GHNotification: Codable, Hashable, Identifiable {
 }
 
 // MARK: - New pull request
+
+/// Someone a review can be requested from: a user with access to the repo, or a team of its organization.
+struct ReviewerCandidate: Codable, Hashable, Identifiable {
+    /// Node ID, what `requestReviews` takes.
+    var id: String
+    var isTeam = false
+    /// Login, or slug for a team.
+    var handle: String
+    var name: String?
+    var avatarUrl: URL?
+    /// Suggested by GitHub for this PR (authors of the lines it touches).
+    var isSuggested = false
+
+    /// Whether this is the reviewer behind a pending review request.
+    func matches(_ reviewer: PRDetailExtra.ReviewRequest.Reviewer) -> Bool {
+        isTeam ? reviewer.isTeam && (reviewer.slug == handle || reviewer.name == name) : reviewer.login == handle
+    }
+}
+
+struct ReviewerCandidates: Codable, Hashable {
+    /// Suggested first, then users by login, then teams.
+    var candidates: [ReviewerCandidate]
+    /// False when the repo has more users than were loaded.
+    var isComplete = true
+}
 
 struct NewPRContext: Codable, Hashable {
     struct Branch: Codable, Hashable, Identifiable {

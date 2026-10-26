@@ -105,7 +105,7 @@ enum Queries {
           viewerCanUpdate viewerCanDeleteHeadRef headRef { id } headRepository { id }
           repository { nameWithOwner mergeCommitAllowed squashMergeAllowed rebaseMergeAllowed }
           reviewRequests(first: 10) {
-            nodes { requestedReviewer { __typename ... on User { login avatarUrl } ... on Team { name } ... on Bot { login avatarUrl } } }
+            nodes { requestedReviewer { __typename ... on User { login avatarUrl } ... on Team { name slug } ... on Bot { login avatarUrl } } }
           }
           reviews(first: 100) {
             nodes { id author { login avatarUrl } state body submittedAt createdAt url }
@@ -235,6 +235,33 @@ enum Queries {
     static let merge = """
     mutation($pr: ID!, $method: PullRequestMergeMethod!) {
       mergePullRequest(input: { pullRequestId: $pr, mergeMethod: $method }) { pullRequest { id merged } }
+    }
+    """
+
+    /// Who a review can be requested from: a page of the users with access to the repo (optionally filtered by
+    /// login or name), plus on the first page GitHub's suggestions for the PR and the organization's teams. Teams
+    /// sit under a top-level `organization` so that a user-owned repo, or a token without `read:org`, only nulls them.
+    static let reviewerCandidates = """
+    query($owner: String!, $name: String!, $number: Int!, $query: String, $after: String, $firstPage: Boolean!) {
+      repository(owner: $owner, name: $name) {
+        pullRequest(number: $number) @include(if: $firstPage) {
+          suggestedReviewers { reviewer { id login name avatarUrl } }
+        }
+        assignableUsers(first: 100, query: $query, after: $after) {
+          pageInfo { hasNextPage endCursor }
+          nodes { id login name avatarUrl }
+        }
+      }
+      organization(login: $owner) @include(if: $firstPage) {
+        teams(first: 100, query: $query, orderBy: { field: NAME, direction: ASC }) { nodes { id name slug } }
+      }
+    }
+    """
+
+    /// Adds reviewers without touching the ones already requested.
+    static let requestReviews = """
+    mutation($pr: ID!, $users: [ID!], $teams: [ID!]) {
+      requestReviews(input: { pullRequestId: $pr, userIds: $users, teamIds: $teams, union: true }) { clientMutationId }
     }
     """
 

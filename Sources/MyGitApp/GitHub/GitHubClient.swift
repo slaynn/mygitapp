@@ -119,9 +119,10 @@ final class GitHubClient: @unchecked Sendable {
         return destination
     }
 
-    func restSend(_ method: String, _ path: String) async throws {
+    func restSend(_ method: String, _ path: String, body: [String: Any]? = nil) async throws {
         var request = makeRequest(Self.api.appendingPathComponent(path))
         request.httpMethod = method
+        if let body { request.httpBody = try JSONSerialization.data(withJSONObject: body) }
         _ = try await send(request)
     }
 
@@ -344,6 +345,53 @@ extension GitHubClient {
         struct R: Decodable { struct Payload: Decodable { struct PR: Decodable { var number: Int }; var pullRequest: PR }; var createPullRequest: Payload }
         let variables: [String: Any?] = ["repo": repositoryId, "base": base, "head": head, "title": title, "body": body, "draft": draft]
         return try await mutate(Queries.createPullRequest, variables, as: R.self).createPullRequest.pullRequest.number
+    }
+
+    /// Users with access to the repo (up to `maxPages` × 100, or those matching `query`), GitHub's suggestions for
+    /// the PR and the organization's teams. The PR author is left out: GitHub refuses them as a reviewer.
+    func reviewerCandidates(_ ref: PRRef, author: String?, query: String? = nil, maxPages: Int = 10) async throws -> ReviewerCandidates {
+        struct User: Decodable { var id: String; var login: String; var name: String?; var avatarUrl: URL? }
+        struct R: Decodable {
+            struct Repo: Decodable {
+                struct PR: Decodable { struct Suggestion: Decodable { var reviewer: User }; var suggestedReviewers: [Suggestion?] }
+                struct Users: Decodable { var pageInfo: PageInfo; var nodes: [User] }
+                var pullRequest: PR?
+                var assignableUsers: Users
+            }
+            struct Org: Decodable {
+                struct Team: Decodable { var id: String; var name: String; var slug: String }
+                struct Teams: Decodable { var nodes: [Team] }
+                var teams: Teams
+            }
+            var repository: Repo?
+            var organization: Org?
+        }
+        var first: R?
+        var users: [User] = []
+        var cursor: String?
+        var isComplete = false
+        for _ in 0..<maxPages {
+            let variables: [String: Any?] = ["owner": ref.owner, "name": ref.name, "number": ref.number, "query": query,
+                                             "after": cursor, "firstPage": cursor == nil]
+            let page = try await graphql(Queries.reviewerCandidates, variables, as: R.self)
+            guard let repo = page.repository else { throw GitHubError.notFound }
+            first = first ?? page
+            users += repo.assignableUsers.nodes
+            guard repo.assignableUsers.pageInfo.hasNextPage else { isComplete = true; break }
+            cursor = repo.assignableUsers.pageInfo.endCursor
+        }
+        let suggested = (first?.repository?.pullRequest?.suggestedReviewers ?? []).compactMap { $0?.reviewer }
+        let suggestedLogins = Set(suggested.map(\.login))
+        let others = users.filter { !suggestedLogins.contains($0.login) }
+            .sorted { $0.login.localizedCaseInsensitiveCompare($1.login) == .orderedAscending }
+        var candidates = (suggested + others)
+            .filter { $0.login != author }
+            .map { ReviewerCandidate(id: $0.id, handle: $0.login, name: $0.name, avatarUrl: $0.avatarUrl,
+                                     isSuggested: suggestedLogins.contains($0.login)) }
+        candidates += (first?.organization?.teams.nodes ?? []).map {
+            ReviewerCandidate(id: $0.id, isTeam: true, handle: $0.slug, name: $0.name)
+        }
+        return ReviewerCandidates(candidates: candidates, isComplete: isComplete)
     }
 
     func contributors(_ nameWithOwner: String) async throws -> [Contributor] {

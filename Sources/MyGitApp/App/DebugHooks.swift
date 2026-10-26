@@ -5,6 +5,7 @@ import AppKit
 ///   MYGITAPP_TAB=conversation | threads | files | checks           PR tab
 ///   MYGITAPP_VERDICT=safe | review | risky | blocked                verdict filter of the local branches screen
 ///   MYGITAPP_BRANCHES=base | compare [MYGITAPP_QUERY=text]          open a branch search of the new PR sheet
+///   MYGITAPP_REVIEWERS=1                                           open the reviewer picker of the PR
 ///   MYGITAPP_SNAPSHOT=/path/shot.png                               window capture, then quit
 enum DebugHooks {
     static let env = ProcessInfo.processInfo.environment
@@ -12,6 +13,7 @@ enum DebugHooks {
     static var initialVerdict: String? { env["MYGITAPP_VERDICT"] }
     static var openBranchField: String? { env["MYGITAPP_BRANCHES"] }
     static var branchQuery: String { env["MYGITAPP_QUERY"] ?? "" }
+    static var openReviewers: Bool { env["MYGITAPP_REVIEWERS"] != nil }
 
     @MainActor
     static func run(_ app: AppState) async {
