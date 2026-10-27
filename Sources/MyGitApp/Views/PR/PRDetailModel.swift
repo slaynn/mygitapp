@@ -72,6 +72,15 @@ final class PRDetailModel {
         if ok { app.refresh() }
     }
 
+    /// Draft ⇄ ready for review.
+    func setDraft(_ draft: Bool, app: AppState) async {
+        guard let pr = detail.value else { return }
+        let ok = await perform("draft", app) { client in
+            try await client.mutate(draft ? Queries.convertToDraft : Queries.markReadyForReview, ["pr": pr.summary.id])
+        }
+        if ok { app.refresh() }
+    }
+
     /// GitHub's "Delete branch" once the PR is merged or closed.
     func deleteHeadBranch(app: AppState) async {
         guard let ref = detail.value?.extra.headRef else { return }

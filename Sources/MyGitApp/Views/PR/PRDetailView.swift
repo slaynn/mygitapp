@@ -121,11 +121,18 @@ struct PRDetailView: View {
     /// Approve / merge need the detail (authorship, allowed merge methods), so they appear once it loads.
     @ViewBuilder private func actions(_ s: PRSummary, extra: PRDetailExtra?) -> some View {
         HStack(spacing: 8) {
-            if model.busy.contains("approve") || model.busy.contains("merge") || model.busy.contains("branch") {
+            if model.busy.contains("approve") || model.busy.contains("merge") || model.busy.contains("draft") || model.busy.contains("branch") {
                 ProgressView().controlSize(.small)
             }
             if let extra, s.state == "OPEN" && !extra.viewerDidAuthor {
                 Button { confirmApprove = true } label: { Label("Approuver", systemImage: "checkmark") }
+            }
+            if let extra, s.state == "OPEN" && s.isDraft && (extra.viewerDidAuthor || extra.viewerCanUpdate) {
+                Button { Task { await model.setDraft(false, app: app) } } label: {
+                    Label("Prête pour review", systemImage: "eye")
+                }
+                .disabled(model.busy.contains("draft"))
+                .help("Sortir la PR du mode brouillon pour demander les reviews")
             }
             if let extra, s.state == "OPEN" && !s.isDraft {
                 Menu {
@@ -133,6 +140,10 @@ struct PRDetailView: View {
                     if repo.squashMergeAllowed ?? true { Button(mergeLabel("SQUASH")) { pendingMerge = "SQUASH" } }
                     if repo.mergeCommitAllowed ?? true { Button(mergeLabel("MERGE")) { pendingMerge = "MERGE" } }
                     if repo.rebaseMergeAllowed ?? true { Button(mergeLabel("REBASE")) { pendingMerge = "REBASE" } }
+                    if extra.viewerDidAuthor || extra.viewerCanUpdate {
+                        Divider()
+                        Button("Repasser en brouillon") { Task { await model.setDraft(true, app: app) } }
+                    }
                 } label: {
                     Label("Merge", systemImage: "arrow.triangle.merge")
                 }
