@@ -121,11 +121,18 @@ struct PRDetailView: View {
     /// Approve / merge need the detail (authorship, allowed merge methods), so they appear once it loads.
     @ViewBuilder private func actions(_ s: PRSummary, extra: PRDetailExtra?) -> some View {
         HStack(spacing: 8) {
-            if model.busy.contains("approve") || model.busy.contains("merge") || model.busy.contains("branch") {
+            if model.busy.contains("approve") || model.busy.contains("merge") || model.busy.contains("ready") || model.busy.contains("branch") {
                 ProgressView().controlSize(.small)
             }
             if let extra, s.state == "OPEN" && !extra.viewerDidAuthor {
                 Button { confirmApprove = true } label: { Label("Approuver", systemImage: "checkmark") }
+            }
+            if let extra, s.state == "OPEN" && s.isDraft && (extra.viewerDidAuthor || extra.viewerCanUpdate) {
+                Button { Task { await model.markReadyForReview(app: app) } } label: {
+                    Label("Prête pour review", systemImage: "eye")
+                }
+                .disabled(model.busy.contains("ready"))
+                .help("Sortir la PR du mode brouillon pour demander les reviews")
             }
             if let extra, s.state == "OPEN" && !s.isDraft {
                 Menu {

@@ -238,6 +238,10 @@ enum Queries {
     }
     """
 
+    static let markReadyForReview = """
+    mutation($pr: ID!) { markPullRequestReadyForReview(input: { pullRequestId: $pr }) { pullRequest { id isDraft } } }
+    """
+
     /// Who a review can be requested from: a page of the users with access to the repo (optionally filtered by
     /// login or name), plus on the first page GitHub's suggestions for the PR and the organization's teams. Teams
     /// sit under a top-level `organization` so that a user-owned repo, or a token without `read:org`, only nulls them.
