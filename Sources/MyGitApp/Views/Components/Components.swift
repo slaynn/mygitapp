@@ -308,7 +308,12 @@ struct Composer: View {
     var submitLabel: String
     /// For a composer the user just opened: typing goes straight into it.
     var autofocus = false
+    /// For an optional message, such as a review's.
+    var allowsEmpty = false
     var onCancel: (() -> Void)?
+    /// Another way to send the text, shown before the main button, such as starting a review.
+    var secondaryLabel: String?
+    var onSecondary: ((String) async -> Bool)?
     var onSubmit: (String) async -> Bool
     @State private var text = ""
     @State private var sending = false
@@ -333,7 +338,7 @@ struct Composer: View {
                 }
                 .onKeyPress(.return, phases: .down) { press in
                     guard press.modifiers.contains(.command) else { return .ignored }
-                    submit()
+                    submit(onSubmit)
                     return .handled
                 }
                 .task { if autofocus { focused = true } } // onAppear is too early: the editor is not in the window yet
@@ -342,19 +347,25 @@ struct Composer: View {
                 Spacer()
                 if let onCancel { Button("Annuler", action: onCancel) }
                 if sending { ProgressView().controlSize(.small) }
-                Button(submitLabel, action: submit)
+                if let secondaryLabel, let onSecondary {
+                    Button(secondaryLabel) { submit(onSecondary) }.disabled(!canSend)
+                }
+                Button(submitLabel) { submit(onSubmit) }
                     .buttonStyle(.borderedProminent)
-                    .disabled(text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || sending)
+                    .disabled(!canSend)
             }
         }
     }
 
-    private func submit() {
-        let body = text.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !body.isEmpty, !sending else { return }
+    private var canSend: Bool {
+        !sending && (allowsEmpty || !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+    }
+
+    private func submit(_ send: @escaping (String) async -> Bool) {
+        guard canSend else { return }
         sending = true
         Task {
-            if await onSubmit(body) { text = "" }
+            if await send(text.trimmingCharacters(in: .whitespacesAndNewlines)) { text = "" }
             sending = false
         }
     }

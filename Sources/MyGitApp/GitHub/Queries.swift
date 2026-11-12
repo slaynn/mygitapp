@@ -226,10 +226,34 @@ enum Queries {
     mutation($subject: ID!, $body: String!) { addComment(input: { subjectId: $subject, body: $body }) { clientMutationId } }
     """
 
-    static let approve = """
-    mutation($pr: ID!, $body: String) {
-      addPullRequestReview(input: { pullRequestId: $pr, event: APPROVE, body: $body }) { pullRequestReview { id } }
+    /// Without an `event` the review stays pending, visible only to the viewer, until it is submitted.
+    /// `threads` optionally opens it with line comments.
+    static let startReview = """
+    mutation($pr: ID!, $commit: GitObjectID, $threads: [DraftPullRequestReviewThread!]) {
+      addPullRequestReview(input: { pullRequestId: $pr, commitOID: $commit, threads: $threads }) { pullRequestReview { id } }
     }
+    """
+
+    static let addReviewThread = """
+    mutation($review: ID!, $path: String!, $line: Int!, $side: DiffSide!, $body: String!) {
+      addPullRequestReviewThread(input: { pullRequestReviewId: $review, path: $path, line: $line, side: $side, body: $body }) {
+        thread { id }
+      }
+    }
+    """
+
+    static let submitReview = """
+    mutation($review: ID!, $event: PullRequestReviewEvent!, $body: String) {
+      submitPullRequestReview(input: { pullRequestReviewId: $review, event: $event, body: $body }) { pullRequestReview { id } }
+    }
+    """
+
+    static let deleteReview = """
+    mutation($review: ID!) { deletePullRequestReview(input: { pullRequestReviewId: $review }) { clientMutationId } }
+    """
+
+    static let deleteReviewComment = """
+    mutation($id: ID!) { deletePullRequestReviewComment(input: { id: $id }) { clientMutationId } }
     """
 
     static let merge = """
