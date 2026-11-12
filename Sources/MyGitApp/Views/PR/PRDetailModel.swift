@@ -59,19 +59,74 @@ final class PRDetailModel {
         }
     }
 
+    // MARK: Review
+
+    /// The viewer's review in progress. GitHub keeps it pending, visible only to them, until it is submitted,
+    /// so it survives restarts and is shared with github.com.
+    var pendingReview: Review? { detail.value?.extra.reviews.nodes.first { $0.state == "PENDING" } }
+
+    var pendingThreads: [ReviewThread] {
+        detail.value?.extra.reviewThreads.nodes.filter(isPending) ?? []
+    }
+
+    func isPending(_ thread: ReviewThread) -> Bool {
+        guard let id = pendingReview?.id else { return false }
+        return thread.root?.pullRequestReview?.id == id
+    }
+
+    func startReview(app: AppState) async -> Bool {
+        guard let pr = detail.value else { return false }
+        return await perform("review", app) { client in
+            try await client.mutate(Queries.startReview, ["pr": pr.summary.id, "commit": pr.extra.headRefOid])
+        }
+    }
+
+    /// Adds a line comment to the pending review, starting the review with it when there is none yet.
+    func addReviewComment(path: String, _ target: CommentTarget, body: String, app: AppState) async -> Bool {
+        guard let pr = detail.value else { return false }
+        let pending = pendingReview?.id
+        return await perform("review", app) { client in
+            let thread: [String: Any] = ["path": path, "line": target.line, "side": target.side, "body": body]
+            if let pending {
+                try await client.mutate(Queries.addReviewThread, thread.merging(["review": pending]) { $1 })
+            } else {
+                try await client.mutate(Queries.startReview, ["pr": pr.summary.id, "commit": pr.extra.headRefOid,
+                                                              "threads": [thread]])
+            }
+        }
+    }
+
+    /// Publishes the pending review at once: its comments, `body`, and `event` (COMMENT, APPROVE or REQUEST_CHANGES).
+    func submitReview(event: String, body: String, app: AppState) async -> Bool {
+        guard let review = pendingReview else { return false }
+        return await perform("review", app) { client in
+            try await client.mutate(Queries.submitReview, ["review": review.id, "event": event,
+                                                           "body": body.isEmpty ? nil : body])
+        }
+    }
+
+    /// Drops the pending review with every comment in it.
+    func discardReview(app: AppState) async -> Bool {
+        guard let review = pendingReview else { return false }
+        return await perform("review", app) { client in
+            try await client.mutate(Queries.deleteReview, ["review": review.id])
+        }
+    }
+
+    /// Removes a comment from the pending review; its thread goes with it.
+    func deletePendingComment(_ thread: ReviewThread, app: AppState) async {
+        guard let comment = thread.root else { return }
+        _ = await perform(thread.id, app) { client in
+            try await client.mutate(Queries.deleteReviewComment, ["id": comment.id])
+        }
+    }
+
     // MARK: PR
 
     func comment(_ body: String, app: AppState) async -> Bool {
         guard let pr = detail.value else { return false }
         return await perform("comment", app) { client in
             try await client.mutate(Queries.addComment, ["subject": pr.summary.id, "body": body])
-        }
-    }
-
-    func approve(app: AppState) async {
-        guard let pr = detail.value else { return }
-        _ = await perform("approve", app) { client in
-            try await client.mutate(Queries.approve, ["pr": pr.summary.id, "body": nil])
         }
     }
 

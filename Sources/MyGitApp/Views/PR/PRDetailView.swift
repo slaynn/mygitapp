@@ -7,7 +7,7 @@ struct PRDetailView: View {
     @State private var tab = Tab(rawValue: DebugHooks.initialPRTab ?? "") ?? .conversation
     @AppStorage("hideResolvedThreads") private var hideResolved = true
     @State private var pendingMerge: String?
-    @State private var confirmApprove = false
+    @State private var isFinishingReview = false
     @State private var confirmDeleteBranch = false
 
     enum Tab: String, Hashable { case conversation, threads, files, checks }
@@ -65,9 +65,8 @@ struct PRDetailView: View {
             }
             Button("Annuler", role: .cancel) {}
         }
-        .confirmationDialog("Approuver cette pull request ?", isPresented: $confirmApprove) {
-            Button("Approuver") { Task { await model.approve(app: app) } }
-            Button("Annuler", role: .cancel) {}
+        .sheet(isPresented: $isFinishingReview) {
+            FinishReviewSheet(model: model, canApprove: model.detail.value?.extra.viewerDidAuthor == false)
         }
         .confirmationDialog("Supprimer la branche \(summary?.headRefName ?? "") ?", isPresented: $confirmDeleteBranch) {
             Button("Supprimer la branche", role: .destructive) { Task { await model.deleteHeadBranch(app: app) } }
@@ -121,11 +120,22 @@ struct PRDetailView: View {
     /// Approve / merge need the detail (authorship, allowed merge methods), so they appear once it loads.
     @ViewBuilder private func actions(_ s: PRSummary, extra: PRDetailExtra?) -> some View {
         HStack(spacing: 8) {
-            if model.busy.contains("approve") || model.busy.contains("merge") || model.busy.contains("draft") || model.busy.contains("branch") {
+            if !model.busy.isDisjoint(with: ["review", "merge", "draft", "branch"]) {
                 ProgressView().controlSize(.small)
             }
-            if let extra, s.state == "OPEN" && !extra.viewerDidAuthor {
-                Button { confirmApprove = true } label: { Label("Approuver", systemImage: "checkmark") }
+            // A pending review outlives the PR being closed, so it can always be finished or abandoned.
+            if model.pendingReview != nil {
+                Button { isFinishingReview = true } label: {
+                    Label("Terminer la review (\(model.pendingThreads.count))", systemImage: "text.bubble")
+                }
+                .buttonStyle(.borderedProminent)
+                .help("Envoyer les commentaires en attente en une fois, avec un message et un verdict")
+            } else if extra != nil && s.state == "OPEN" {
+                Button { Task { if await model.startReview(app: app) { tab = .files } } } label: {
+                    Label("Commencer une review", systemImage: "text.bubble")
+                }
+                .disabled(model.busy.contains("review"))
+                .help("Commenter des lignes en brouillon, puis tout envoyer en une fois")
             }
             if let extra, s.state == "OPEN" && s.isDraft && (extra.viewerDidAuthor || extra.viewerCanUpdate) {
                 Button { Task { await model.setDraft(false, app: app) } } label: {
@@ -216,6 +226,58 @@ struct PRDetailView: View {
             FilesTab(model: model, threads: pr.extra.reviewThreads.nodes, canComment: pr.summary.state != "MERGED")
         case .checks:
             ChecksTab(checks: pr.extra.checks, prURL: pr.summary.url)
+        }
+    }
+}
+
+/// "Terminer la review": sends the pending review's comments at once, with a message and a verdict.
+private struct FinishReviewSheet: View {
+    @Environment(AppState.self) private var app
+    @Environment(\.dismiss) private var dismiss
+    var model: PRDetailModel
+    /// GitHub refuses approving or requesting changes on your own PR.
+    var canApprove: Bool
+    @State private var event = "COMMENT"
+    @State private var confirmDiscard = false
+
+    var body: some View {
+        let count = model.pendingThreads.count
+        VStack(alignment: .leading, spacing: 14) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Terminer la review").font(.system(size: 15, weight: .semibold))
+                Text("\(count) commentaire(s) en attente, visibles seulement par toi jusqu'à l'envoi.")
+                    .font(.system(size: 12)).foregroundStyle(.secondary)
+            }
+            Picker("Verdict", selection: $event) {
+                Text("Commenter").tag("COMMENT")
+                if canApprove {
+                    Text("Approuver").tag("APPROVE")
+                    Text("Demander des changements").tag("REQUEST_CHANGES")
+                }
+            }
+            .pickerStyle(.radioGroup)
+            .labelsHidden()
+            if let error = model.actionError { ErrorBanner(message: error) }
+            Composer(placeholder: "Message de la review (markdown, facultatif)…", submitLabel: "Envoyer la review",
+                     autofocus: true, allowsEmpty: true, onCancel: { dismiss() }) { text in
+                let ok = await model.submitReview(event: event, body: text, app: app)
+                if ok { dismiss() }
+                return ok
+            }
+            Divider()
+            Button("Abandonner la review…", role: .destructive) { confirmDiscard = true }
+                .disabled(model.busy.contains("review"))
+        }
+        .padding(20)
+        .frame(width: 520)
+        .onAppear { model.actionError = nil }
+        .confirmationDialog("Abandonner la review ?", isPresented: $confirmDiscard) {
+            Button("Abandonner la review", role: .destructive) {
+                Task { if await model.discardReview(app: app) { dismiss() } }
+            }
+            Button("Annuler", role: .cancel) {}
+        } message: {
+            Text("Ses \(count) commentaire(s) en attente seront supprimés.")
         }
     }
 }

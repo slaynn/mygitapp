@@ -143,11 +143,15 @@ private struct FileDiffView: View {
                                 .background(Theme.background)
                             }
                             if let target, target == draft {
-                                Composer(placeholder: "Commenter la ligne \(target.line) (markdown)…", submitLabel: "Commenter",
-                                         autofocus: true, onCancel: { draft = nil }) { text in
-                                    let ok = await model.commentOnLine(path: file.filename, target, body: text, app: app)
-                                    if ok { draft = nil }
-                                    return ok
+                                // Like GitHub: during a review the comment joins it; otherwise it goes out
+                                // alone, or starts the review.
+                                let reviewing = model.pendingReview != nil
+                                Composer(placeholder: "Commenter la ligne \(target.line) (markdown)…",
+                                         submitLabel: reviewing ? "Ajouter à la review" : "Commenter",
+                                         autofocus: true, onCancel: { draft = nil },
+                                         secondaryLabel: reviewing ? nil : "Commencer une review",
+                                         onSecondary: { await send($0, on: target, toReview: true) }) { text in
+                                    await send(text, on: target, toReview: reviewing)
                                 }
                                 .padding(10)
                                 .background(Theme.background)
@@ -202,6 +206,16 @@ private struct FileDiffView: View {
         case "renamed": Image(systemName: "arrow.right.square").foregroundStyle(Theme.blue)
         default: Image(systemName: "square.dashed.inset.filled").foregroundStyle(Theme.yellow)
         }
+    }
+
+    private func send(_ text: String, on target: CommentTarget, toReview: Bool) async -> Bool {
+        let ok = if toReview {
+            await model.addReviewComment(path: file.filename, target, body: text, app: app)
+        } else {
+            await model.commentOnLine(path: file.filename, target, body: text, app: app)
+        }
+        if ok { draft = nil }
+        return ok
     }
 
     /// Diff line id → threads whose (side, line) lands on it.

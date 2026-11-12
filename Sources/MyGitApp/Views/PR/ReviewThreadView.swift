@@ -50,6 +50,7 @@ struct ReviewThreadView: View {
                 .font(Theme.monoSmall)
                 .lineLimit(1)
                 .truncationMode(.head)
+            if model.isPending(thread) { Badge(text: "En attente", color: Theme.purple) }
             if thread.isResolved { Badge(text: "Résolu", color: Theme.green) }
             if thread.isOutdated { Badge(text: "Outdated", color: Theme.yellow) }
             if !isExpanded {
@@ -67,7 +68,14 @@ struct ReviewThreadView: View {
             .buttonStyle(.plain)
             .foregroundStyle(.secondary)
             .help("Copier ce thread pour Codex / Claude")
-            if thread.isResolved ? thread.viewerCanUnresolve : thread.viewerCanResolve {
+            if model.isPending(thread) {
+                // Not published yet: nothing to resolve or reply to, but it can still be dropped.
+                Button { Task { await model.deletePendingComment(thread, app: app) } } label: { Image(systemName: "trash") }
+                    .buttonStyle(.plain)
+                    .foregroundStyle(.secondary)
+                    .disabled(model.busy.contains(thread.id))
+                    .help("Retirer ce commentaire de la review")
+            } else if thread.isResolved ? thread.viewerCanUnresolve : thread.viewerCanResolve {
                 Button(thread.isResolved ? "Rouvrir" : "Résoudre") {
                     let resolving = !thread.isResolved
                     if resolving { expanded = false }
@@ -83,7 +91,7 @@ struct ReviewThreadView: View {
     }
 
     @ViewBuilder private var footer: some View {
-        if thread.viewerCanReply {
+        if thread.viewerCanReply && !model.isPending(thread) {
             Divider()
             Group {
                 if replying {

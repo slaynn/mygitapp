@@ -14,9 +14,14 @@ Client GitHub natif macOS (SwiftUI), rapide, centré sur les repos que tu choisi
     les réponses ; les pushes et commentaires sont intercalés à leur date. Les threads résolus peuvent être masqués.
   - *Threads* : tous les threads groupés par fichier, comme une to-do pour traiter une review.
   - *Files* : le diff, avec les threads insérés à leur ligne. Au survol d'une ligne, un « + » ouvre un commentaire
-    sur cette ligne, publié directement (comme « Add single comment » sur GitHub).
+    sur cette ligne : « Commenter » le publie seul, « Commencer une review » ou « Ajouter à la review » le garde
+    en attente.
+  - *Review* : « Commencer une review » (en-tête) ouvre une review en attente. GitHub la garde, visible de toi seul
+    (y compris sur github.com), jusqu'à l'envoi. Ses commentaires portent le badge « En attente » et peuvent être
+    retirés ; « Terminer la review (n) » envoie tout en une fois, avec un message et Commenter / Approuver /
+    Demander des changements, ou abandonne la review.
   - *Checks* : statut CI du dernier commit.
-  - Actions : répondre, résoudre / rouvrir, commenter, approuver, merger (squash / merge / rebase).
+  - Actions : répondre, résoudre / rouvrir, commenter, reviewer, merger (squash / merge / rebase).
   - *Reviewers* : sous l'en-tête, les reviews en attente (retirables) et « Demander une review », une liste
     filtrable au clavier des personnes ayant accès au repo (suggestions de GitHub en tête) et des équipes de l'org.
   - **« Pour l'agent »** copie un thread (ou tous les non résolus) en markdown prêt à coller dans Codex / Claude.
