@@ -17,6 +17,22 @@ struct DiffLine: Hashable, Identifiable {
         case .hunkHeader, .noNewline: text
         }
     }
+
+    /// Where a new review comment on this line goes: GitHub puts deletions on the old side and
+    /// additions and context lines on the new one. Nil for lines that take no comment.
+    var commentTarget: CommentTarget? {
+        switch kind {
+        case .deletion: oldLine.map { CommentTarget(side: "LEFT", line: $0) }
+        case .addition, .context: newLine.map { CommentTarget(side: "RIGHT", line: $0) }
+        case .hunkHeader, .noNewline: nil
+        }
+    }
+}
+
+/// A line of a file in GitHub's terms: `side` is "LEFT" (base) or "RIGHT" (head), `line` its number there.
+struct CommentTarget: Hashable {
+    var side: String
+    var line: Int
 }
 
 enum DiffParser {

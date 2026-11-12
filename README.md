@@ -13,7 +13,8 @@ Client GitHub natif macOS (SwiftUI), rapide, centré sur les repos que tu choisi
   - *Conversation* : chaque review affiche les threads qu'elle a ouverts, avec l'extrait de code ciblé et toutes
     les réponses ; les pushes et commentaires sont intercalés à leur date. Les threads résolus peuvent être masqués.
   - *Threads* : tous les threads groupés par fichier, comme une to-do pour traiter une review.
-  - *Files* : le diff, avec les threads insérés à leur ligne.
+  - *Files* : le diff, avec les threads insérés à leur ligne. Au survol d'une ligne, un « + » ouvre un commentaire
+    sur cette ligne, publié directement (comme « Add single comment » sur GitHub).
   - *Checks* : statut CI du dernier commit.
   - Actions : répondre, résoudre / rouvrir, commenter, approuver, merger (squash / merge / rebase).
   - *Reviewers* : sous l'en-tête, les reviews en attente (retirables) et « Demander une review », une liste

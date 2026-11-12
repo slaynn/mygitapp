@@ -31,6 +31,16 @@ import Testing
         #expect(lines[3].rawText == "+let b = 3")
     }
 
+    @Test func commentTargetsFollowGitHubSides() {
+        let lines = DiffParser.parse(patch)
+        #expect(lines[0].commentTarget == nil)
+        #expect(lines[2].commentTarget == CommentTarget(side: "LEFT", line: 11))
+        #expect(lines[4].commentTarget == CommentTarget(side: "RIGHT", line: 12))
+        // A context line whose numbers differ on each side is commented at its new number.
+        #expect(lines[5].commentTarget == CommentTarget(side: "RIGHT", line: 13))
+        #expect(lines[6].commentTarget == nil)
+    }
+
     @Test func parsesHeaders() {
         #expect(DiffParser.parseHeader("@@ -1 +1 @@")! == (1, 1))
         #expect(DiffParser.parseHeader("@@ -12,7 +15,9 @@ context")! == (12, 15))
