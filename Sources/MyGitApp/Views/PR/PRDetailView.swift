@@ -213,7 +213,7 @@ struct PRDetailView: View {
         case .threads:
             ThreadsTab(pr: pr, model: model, hideResolved: hideResolved)
         case .files:
-            FilesTab(model: model, threads: pr.extra.reviewThreads.nodes)
+            FilesTab(model: model, threads: pr.extra.reviewThreads.nodes, canComment: pr.summary.state != "MERGED")
         case .checks:
             ChecksTab(checks: pr.extra.checks, prURL: pr.summary.url)
         }

@@ -306,6 +306,8 @@ private struct DetailsBlock: View {
 struct Composer: View {
     var placeholder: String
     var submitLabel: String
+    /// For a composer the user just opened: typing goes straight into it.
+    var autofocus = false
     var onCancel: (() -> Void)?
     var onSubmit: (String) async -> Bool
     @State private var text = ""
@@ -334,6 +336,7 @@ struct Composer: View {
                     submit()
                     return .handled
                 }
+                .task { if autofocus { focused = true } } // onAppear is too early: the editor is not in the window yet
             HStack(spacing: 8) {
                 Text("⌘↩").font(.caption).foregroundStyle(.tertiary)
                 Spacer()

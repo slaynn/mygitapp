@@ -160,6 +160,9 @@ struct DiffExcerptView: View {
 struct DiffLineRow: View {
     var line: DiffLine
     var highlighted = false
+    /// Files tab: hovering the line shows a "+" over its marker that starts a comment on it.
+    var onComment: (() -> Void)?
+    @State private var hovering = false
 
     var body: some View {
         HStack(alignment: .top, spacing: 0) {
@@ -179,6 +182,19 @@ struct DiffLineRow: View {
                 Text(marker)
                     .frame(width: 18)
                     .foregroundStyle(markerColor)
+                    .overlay {
+                        if hovering, let onComment {
+                            Button(action: onComment) {
+                                Image(systemName: "plus")
+                                    .font(.system(size: 9, weight: .bold))
+                                    .foregroundStyle(.white)
+                                    .frame(width: 16, height: 16)
+                                    .background(Theme.blue, in: RoundedRectangle(cornerRadius: 4))
+                            }
+                            .buttonStyle(.plain)
+                            .help("Commenter cette ligne")
+                        }
+                    }
                 Text(line.text.isEmpty ? " " : line.text.replacingOccurrences(of: "\t", with: "    "))
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .fixedSize(horizontal: false, vertical: true)
@@ -190,6 +206,7 @@ struct DiffLineRow: View {
         .overlay(alignment: .leading) {
             if highlighted { Rectangle().fill(Theme.orange).frame(width: 2) }
         }
+        .onHover { hovering = onComment != nil && $0 }
     }
 
     private var marker: String {

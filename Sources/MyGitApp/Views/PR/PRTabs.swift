@@ -50,6 +50,7 @@ struct ThreadsTab: View {
 struct FilesTab: View {
     var model: PRDetailModel
     var threads: [ReviewThread]
+    var canComment: Bool
     @State private var collapsed: Set<String> = []
     @State private var expandedByUser: Set<String> = []
 
@@ -73,6 +74,7 @@ struct FilesTab: View {
                     FileDiffView(file: file,
                                  threads: threads.filter { $0.path == file.filename },
                                  model: model,
+                                 canComment: canComment,
                                  isExpanded: isExpanded(file),
                                  toggle: { toggle(file) })
                 }
@@ -102,11 +104,15 @@ struct FilesTab: View {
 }
 
 private struct FileDiffView: View {
+    @Environment(AppState.self) private var app
     var file: PRFile
     var threads: [ReviewThread]
     var model: PRDetailModel
+    var canComment: Bool
     var isExpanded: Bool
     var toggle: () -> Void
+    /// The line whose comment composer is open.
+    @State private var draft: CommentTarget?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -126,10 +132,22 @@ private struct FileDiffView: View {
                     }
                     LazyVStack(alignment: .leading, spacing: 0) {
                         ForEach(lines) { line in
-                            DiffLineRow(line: line)
+                            let target = line.commentTarget
+                            DiffLineRow(line: line, highlighted: target != nil && target == draft,
+                                        onComment: canComment && target != nil ? { draft = target } : nil)
                             if let lineThreads = anchored[line.id] {
                                 VStack(alignment: .leading, spacing: 8) {
                                     ForEach(lineThreads) { ReviewThreadView(thread: $0, model: model, showExcerpt: false) }
+                                }
+                                .padding(10)
+                                .background(Theme.background)
+                            }
+                            if let target, target == draft {
+                                Composer(placeholder: "Commenter la ligne \(target.line) (markdown)…", submitLabel: "Commenter",
+                                         autofocus: true, onCancel: { draft = nil }) { text in
+                                    let ok = await model.commentOnLine(path: file.filename, target, body: text, app: app)
+                                    if ok { draft = nil }
+                                    return ok
                                 }
                                 .padding(10)
                                 .background(Theme.background)

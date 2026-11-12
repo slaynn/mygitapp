@@ -48,6 +48,17 @@ final class PRDetailModel {
         if !ok { updateThread(thread.id) { $0.isResolved = !resolved } }
     }
 
+    /// Starts a thread on one line of the diff, published right away like GitHub's "Add single comment".
+    /// The reload brings the new thread back, anchored to its line in the Files tab.
+    func commentOnLine(path: String, _ target: CommentTarget, body: String, app: AppState) async -> Bool {
+        guard let pr = detail.value else { return false }
+        return await perform("line-comment", app) { [ref] client in
+            try await client.restSend("POST", "repos/\(ref.owner)/\(ref.name)/pulls/\(ref.number)/comments",
+                                      body: ["body": body, "commit_id": pr.extra.headRefOid, "path": path,
+                                             "line": target.line, "side": target.side])
+        }
+    }
+
     // MARK: PR
 
     func comment(_ body: String, app: AppState) async -> Bool {
