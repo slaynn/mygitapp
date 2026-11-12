@@ -1,0 +1,39 @@
+#!/usr/bin/env bash
+# Amp orb setup. MyGitApp is a macOS SwiftUI app: it does not build on this Linux orb, which only edits code
+# and runs git and gh (both preinstalled). Xcode, `swift build` and `swift test` run on the thread's Mac
+# satellite, which resolves the SwiftPM dependencies itself. So nothing is installed here; setup only leaves
+# notes for agents working in the orb.
+set -euo pipefail
+
+notes="$HOME/.config/amp/AGENTS.md"
+begin="<!-- mygitapp orb notes: begin -->"
+end="<!-- mygitapp orb notes: end -->"
+
+echo "Writing MyGitApp notes to $notes"
+mkdir -p "$(dirname "$notes")"
+touch "$notes"
+# A stale snapshot already has the block: replace it rather than append a second one.
+sed -i "/^$begin\$/,/^$end\$/d" "$notes"
+cat >> "$notes" <<EOF
+$begin
+# MyGitApp in an orb
+
+- This orb has no Swift toolchain: MyGitApp only builds on macOS. Start a Mac satellite (the default image works)
+  and run \`swift build\`, \`swift test\` and \`scripts/bundle.sh debug\` there with mac_shell. A cold build,
+  SwiftPM dependencies included, takes about 15 s.
+- Screen checks use the README's \`MYGITAPP_OPEN\` / \`MYGITAPP_TAB\` / \`MYGITAPP_SNAPSHOT\` hooks.
+  \`MYGITAPP_DELAY\` (seconds, default 6) delays the capture: a long delay keeps the app open so you can drive it
+  with \`cliclick\` (\`brew install cliclick\`) and capture it with \`screencapture -x\`. Text typed with cliclick
+  stops SwiftUI hover updates in the whole window until relaunch, so check hover states before typing.
+- The app takes its GitHub token from \`gh auth token\`. gh on the Mac is logged out and its keychain is locked
+  (\`security add-generic-password\` fails), so log gh in without printing the token: on the orb, write
+  \`gh auth token\` to a 0600 file outside the repo and serve it from 127.0.0.1 with \`python3 -m http.server\`;
+  forward that port with mac_sidecar start \`forward_ports\`; once the file is written, run on the Mac
+  \`curl -s http://127.0.0.1:PORT/FILE > /tmp/t && gh auth login --with-token < /tmp/t; rm -f /tmp/t\`.
+  Then stop the server, delete the file, and run \`gh auth logout\` on the Mac when done. This token reads public
+  repos; the sidebar's "HTTP 403 : Resource not accessible by integration" (notifications) is expected.
+- slaynn/mygitapp often has no open PR. Open PRs of public repos, such as gonzalezreal/swift-markdown-ui,
+  render fine for checking the PR screens.
+$end
+EOF
+echo "Done"
