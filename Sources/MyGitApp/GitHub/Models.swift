@@ -181,6 +181,8 @@ struct PRDetailExtra: Codable, Hashable {
     }
 
     var body: String
+    /// Optional, like `IssueComment.reactionGroups`, so detail caches written before reactions were fetched still decode.
+    var reactionGroups: [ReactionGroup]?
     var headRefOid: String
     var changedFiles: Int
     var mergeable: String
@@ -281,6 +283,34 @@ struct IssueComment: Codable, Hashable, Identifiable {
     var body: String
     var createdAt: Date
     var url: URL
+    var reactionGroups: [ReactionGroup]?
+}
+
+/// One emoji's reactions on a comment or a PR description, such as the 👍 Codex leaves when its review finds nothing.
+struct ReactionGroup: Codable, Hashable {
+    struct Reactors: Codable, Hashable {
+        /// Optional so a reactor type outside `Actor` added later by GitHub cannot break the whole PR's decoding.
+        struct Reactor: Codable, Hashable { var login: String? }
+        var totalCount: Int
+        var nodes: [Reactor]
+    }
+    var content: String
+    var viewerHasReacted: Bool
+    var reactors: Reactors
+
+    var emoji: String {
+        switch content {
+        case "THUMBS_UP": "👍"
+        case "THUMBS_DOWN": "👎"
+        case "LAUGH": "😄"
+        case "HOORAY": "🎉"
+        case "CONFUSED": "😕"
+        case "HEART": "❤️"
+        case "ROCKET": "🚀"
+        case "EYES": "👀"
+        default: content
+        }
+    }
 }
 
 struct SimpleEvent: Codable, Hashable, Identifiable {
