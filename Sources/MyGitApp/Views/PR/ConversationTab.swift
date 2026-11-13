@@ -16,7 +16,8 @@ struct ConversationTab: View {
         LazyVStack(alignment: .leading, spacing: 14) {
             CommentCard(author: pr.summary.author, date: pr.summary.createdAt, url: pr.summary.url,
                         markdown: pr.extra.body, action: "a ouvert la PR", emptyText: "Pas de description.",
-                        reactions: pr.extra.reactionGroups ?? [])
+                        reactions: ReactionBar(subject: pr.summary.id, groups: pr.extra.reactionGroups,
+                                               canReact: pr.extra.viewerCanReact, model: model))
             ForEach(timeline) { entry in
                 switch entry {
                 case .review(let group):
@@ -27,7 +28,9 @@ struct ConversationTab: View {
                     }
                 case .comment(let comment):
                     CommentCard(author: comment.author, date: comment.createdAt, url: comment.url,
-                                markdown: comment.body, action: "a commenté", reactions: comment.reactionGroups ?? [])
+                                markdown: comment.body, action: "a commenté",
+                                reactions: ReactionBar(subject: comment.id, groups: comment.reactionGroups,
+                                                       canReact: comment.viewerCanReact, model: model))
                 case .commits(let commits):
                     PushedCommits(commits: commits)
                 case .event(let type, let event):
@@ -108,7 +111,7 @@ struct CommentCard: View {
     var markdown: String
     var action: String
     var emptyText: String?
-    var reactions: [ReactionGroup] = []
+    var reactions: ReactionBar?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -124,7 +127,7 @@ struct CommentCard: View {
                 } else {
                     MarkdownBody(markdown: markdown)
                 }
-                ReactionBar(groups: reactions)
+                reactions
             }
             .padding(14)
         }
@@ -133,30 +136,84 @@ struct CommentCard: View {
     }
 }
 
-/// GitHub's reaction pills under a comment, such as the 👍 Codex leaves on the description instead of a review
-/// when it finds nothing. The viewer's own reactions are highlighted; hovering a pill names who reacted.
+/// GitHub's reactions under a comment, a review or the description, such as the 👍 Codex leaves on the description
+/// instead of a review when it finds nothing. The smiley opens GitHub's eight emojis; clicking a pill adds or removes
+/// the viewer's reaction. The viewer's own reactions are highlighted; hovering a pill names who reacted.
 struct ReactionBar: View {
-    var groups: [ReactionGroup]
+    @Environment(AppState.self) private var app
+    /// ID of the PR, review or comment the reactions belong to.
+    var subject: String
+    var groups: [ReactionGroup]?
+    /// Nil in detail caches older than the field: read-only until the reload.
+    var canReact: Bool?
+    var model: PRDetailModel
+    @State private var picking = false
 
     var body: some View {
-        let used = groups.filter { $0.reactors.totalCount > 0 }
-        if !used.isEmpty {
+        let used = (groups ?? []).filter { $0.reactors.totalCount > 0 }
+        let canReact = canReact == true
+        let busy = model.busy.contains(subject)
+        if !used.isEmpty || canReact {
             HStack(spacing: 6) {
-                ForEach(used, id: \.content) { group in
-                    let color = group.viewerHasReacted ? Theme.blue : Theme.gray
-                    HStack(spacing: 4) {
-                        Text(group.emoji)
-                        Text("\(group.reactors.totalCount)").foregroundStyle(group.viewerHasReacted ? Theme.blue : .secondary)
+                if canReact {
+                    Button { picking = true } label: {
+                        Image(systemName: "face.smiling")
+                            .font(.system(size: 13))
+                            .foregroundStyle(.secondary)
+                            .frame(width: 26, height: 22)
+                            .background(Theme.gray.opacity(0.12), in: Capsule())
+                            .overlay(Capsule().stroke(Theme.gray.opacity(0.35), lineWidth: 0.5))
                     }
-                    .font(.system(size: 12, weight: .medium))
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 3)
-                    .background(color.opacity(0.12), in: Capsule())
-                    .overlay(Capsule().stroke(color.opacity(0.35), lineWidth: 0.5))
-                    .help(tooltip(group))
+                    .buttonStyle(.plain)
+                    .disabled(busy)
+                    .help("Ajouter une réaction")
+                    .popover(isPresented: $picking, arrowEdge: .bottom) { picker }
+                }
+                ForEach(used, id: \.content) { group in
+                    Button { toggle(group.content) } label: { pill(group) }
+                        .buttonStyle(.plain)
+                        .disabled(!canReact || busy)
+                        .help(tooltip(group))
                 }
             }
         }
+    }
+
+    private var picker: some View {
+        HStack(spacing: 2) {
+            ForEach(ReactionGroup.contents, id: \.self) { content in
+                let mine = groups?.first { $0.content == content }?.viewerHasReacted == true
+                Button {
+                    picking = false
+                    toggle(content)
+                } label: {
+                    Text(ReactionGroup.emoji(content))
+                        .font(.system(size: 18))
+                        .frame(width: 32, height: 32)
+                        .background(mine ? Theme.blue.opacity(0.18) : .clear, in: RoundedRectangle(cornerRadius: 6))
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .padding(6)
+    }
+
+    private func pill(_ group: ReactionGroup) -> some View {
+        let color = group.viewerHasReacted ? Theme.blue : Theme.gray
+        return HStack(spacing: 4) {
+            Text(group.emoji)
+            Text("\(group.reactors.totalCount)").foregroundStyle(group.viewerHasReacted ? Theme.blue : .secondary)
+        }
+        .font(.system(size: 12, weight: .medium))
+        .padding(.horizontal, 8)
+        .padding(.vertical, 3)
+        .background(color.opacity(0.12), in: Capsule())
+        .overlay(Capsule().stroke(color.opacity(0.35), lineWidth: 0.5))
+        .contentShape(Capsule())
+    }
+
+    private func toggle(_ content: String) {
+        Task { await model.toggleReaction(content, on: subject, app: app) }
     }
 
     private func tooltip(_ group: ReactionGroup) -> String {
@@ -205,6 +262,8 @@ struct ReviewCard: View {
                     if expanded {
                         MarkdownBody(markdown: review.body)
                     }
+                    ReactionBar(subject: review.id, groups: review.reactionGroups, canReact: review.viewerCanReact,
+                                model: model)
                     Button(expanded ? "Réduire" : "Afficher le résumé de la review") { bodyExpanded = !expanded }
                         .buttonStyle(.link)
                         .font(.caption)

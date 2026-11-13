@@ -181,8 +181,10 @@ struct PRDetailExtra: Codable, Hashable {
     }
 
     var body: String
-    /// Optional, like `IssueComment.reactionGroups`, so detail caches written before reactions were fetched still decode.
+    /// Optional, like the other `reactionGroups` and `viewerCanReact`, so detail caches written before reactions were
+    /// fetched still decode.
     var reactionGroups: [ReactionGroup]?
+    var viewerCanReact: Bool?
     var headRefOid: String
     var changedFiles: Int
     var mergeable: String
@@ -214,6 +216,8 @@ struct Review: Codable, Hashable, Identifiable {
     var submittedAt: Date?
     var createdAt: Date
     var url: URL
+    var reactionGroups: [ReactionGroup]?
+    var viewerCanReact: Bool?
 }
 
 struct ReviewComment: Codable, Hashable, Identifiable {
@@ -226,6 +230,8 @@ struct ReviewComment: Codable, Hashable, Identifiable {
     var diffHunk: String
     var outdated: Bool
     var pullRequestReview: ReviewID?
+    var reactionGroups: [ReactionGroup]?
+    var viewerCanReact: Bool?
 }
 
 struct ReviewThread: Codable, Hashable, Identifiable {
@@ -284,9 +290,10 @@ struct IssueComment: Codable, Hashable, Identifiable {
     var createdAt: Date
     var url: URL
     var reactionGroups: [ReactionGroup]?
+    var viewerCanReact: Bool?
 }
 
-/// One emoji's reactions on a comment or a PR description, such as the 👍 Codex leaves when its review finds nothing.
+/// One emoji's reactions on a comment, a review or a PR description, such as the 👍 Codex leaves when its review finds nothing.
 struct ReactionGroup: Codable, Hashable {
     struct Reactors: Codable, Hashable {
         /// Optional so a reactor type outside `Actor` added later by GitHub cannot break the whole PR's decoding.
@@ -298,7 +305,12 @@ struct ReactionGroup: Codable, Hashable {
     var viewerHasReacted: Bool
     var reactors: Reactors
 
-    var emoji: String {
+    /// GitHub's eight reactions, in the order of its picker and of `reactionGroups`.
+    static let contents = ["THUMBS_UP", "THUMBS_DOWN", "LAUGH", "HOORAY", "CONFUSED", "HEART", "ROCKET", "EYES"]
+
+    var emoji: String { Self.emoji(content) }
+
+    static func emoji(_ content: String) -> String {
         switch content {
         case "THUMBS_UP": "👍"
         case "THUMBS_DOWN": "👎"

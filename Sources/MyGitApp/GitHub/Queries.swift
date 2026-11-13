@@ -97,8 +97,9 @@ enum Queries {
     """
 
     /// GitHub returns every emoji, at zero when nobody used it; the first reactors name the pill's tooltip.
+    /// `viewerCanReact` is false on locked conversations and on comments of a pending review.
     static let reactionGroups = """
-    reactionGroups { content viewerHasReacted reactors(first: 10) { totalCount nodes { ... on Actor { login } } } }
+    viewerCanReact reactionGroups { content viewerHasReacted reactors(first: 10) { totalCount nodes { ... on Actor { login } } } }
     """
 
     static let pullRequestDetail = """
@@ -113,7 +114,7 @@ enum Queries {
             nodes { requestedReviewer { __typename ... on User { login avatarUrl } ... on Team { name slug } ... on Bot { login avatarUrl } } }
           }
           reviews(first: 100) {
-            nodes { id author { login avatarUrl } state body submittedAt createdAt url }
+            nodes { id author { login avatarUrl } state body submittedAt createdAt url \(reactionGroups) }
           }
           reviewThreads(first: 100) {
             nodes {
@@ -123,7 +124,7 @@ enum Queries {
               comments(first: 60) {
                 nodes {
                   id author { login avatarUrl } body createdAt url diffHunk outdated
-                  pullRequestReview { id }
+                  pullRequestReview { id } \(reactionGroups)
                 }
               }
             }
@@ -216,6 +217,18 @@ enum Queries {
     static let addReply = """
     mutation($thread: ID!, $body: String!) {
       addPullRequestReviewThreadReply(input: { pullRequestReviewThreadId: $thread, body: $body }) { comment { id } }
+    }
+    """
+
+    static let addReaction = """
+    mutation($subject: ID!, $content: ReactionContent!) {
+      addReaction(input: { subjectId: $subject, content: $content }) { clientMutationId }
+    }
+    """
+
+    static let removeReaction = """
+    mutation($subject: ID!, $content: ReactionContent!) {
+      removeReaction(input: { subjectId: $subject, content: $content }) { clientMutationId }
     }
     """
 

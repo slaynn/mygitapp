@@ -20,6 +20,9 @@ Client GitHub natif macOS (SwiftUI), rapide, centré sur les repos que tu choisi
     (y compris sur github.com), jusqu'à l'envoi. Ses commentaires portent le badge « En attente » et peuvent être
     retirés ; « Terminer la review (n) » envoie tout en une fois, avec un message et Commenter / Approuver /
     Demander des changements, ou abandonne la review.
+  - *Réactions* : sous la description, les commentaires, les reviews et chaque message des threads, comme sur
+    GitHub (dont le 👍 que Codex laisse sur la description quand sa review ne trouve rien). Le bouton 😊 ajoute
+    une réaction ; cliquer une pastille ajoute ou retire la tienne (en bleu). Au survol, qui a réagi.
   - *Checks* : statut CI du dernier commit.
   - Actions : répondre, résoudre / rouvrir, commenter, reviewer, merger (squash / merge / rebase).
   - *Reviewers* : sous l'en-tête, les reviews en attente (retirables) et « Demander une review », une liste

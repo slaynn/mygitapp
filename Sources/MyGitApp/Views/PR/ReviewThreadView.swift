@@ -27,6 +27,8 @@ struct ReviewThreadView: View {
                     VStack(alignment: .leading, spacing: 8) {
                         AuthorLine(author: comment.author, action: "", date: comment.createdAt, url: comment.url)
                         MarkdownBody(markdown: comment.body)
+                        ReactionBar(subject: comment.id, groups: comment.reactionGroups,
+                                    canReact: comment.viewerCanReact, model: model)
                     }
                     .padding(12)
                 }

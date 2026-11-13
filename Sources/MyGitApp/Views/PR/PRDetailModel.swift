@@ -164,6 +164,21 @@ final class PRDetailModel {
         }
     }
 
+    /// Adds the viewer's `content` reaction to `subject` (the PR, a review, or any comment), or removes it when it is
+    /// already there, like clicking a reaction on GitHub.
+    func toggleReaction(_ content: String, on subject: String, app: AppState) async {
+        var removing = false
+        updateReactions(subject) { groups in
+            removing = groups.first { $0.content == content }?.viewerHasReacted ?? false
+            Self.toggle(content, in: &groups, viewer: app.viewer?.login)
+        }
+        let ok = await perform(subject, app) { client in
+            try await client.mutate(removing ? Queries.removeReaction : Queries.addReaction,
+                                    ["subject": subject, "content": content])
+        }
+        if !ok { updateReactions(subject) { Self.toggle(content, in: &$0, viewer: app.viewer?.login) } }
+    }
+
     // MARK: Reviewers
 
     func loadReviewers(_ app: AppState) async {
@@ -211,6 +226,50 @@ final class PRDetailModel {
     private func updateThread(_ id: String, _ change: (inout ReviewThread) -> Void) {
         guard let index = detail.value?.extra.reviewThreads.nodes.firstIndex(where: { $0.id == id }) else { return }
         change(&detail.value!.extra.reviewThreads.nodes[index])
+    }
+
+    /// Applies `change` to the reactions of whichever item has the ID `subject`.
+    private func updateReactions(_ subject: String, _ change: (inout [ReactionGroup]) -> Void) {
+        guard var pr = detail.value else { return }
+        func apply(_ groups: inout [ReactionGroup]?) {
+            var list = groups ?? []
+            change(&list)
+            groups = list
+        }
+        if pr.summary.id == subject { apply(&pr.extra.reactionGroups) }
+        for i in pr.extra.reviews.nodes.indices where pr.extra.reviews.nodes[i].id == subject {
+            apply(&pr.extra.reviews.nodes[i].reactionGroups)
+        }
+        for i in pr.extra.timelineItems.nodes.indices {
+            if case .comment(var comment) = pr.extra.timelineItems.nodes[i], comment.id == subject {
+                apply(&comment.reactionGroups)
+                pr.extra.timelineItems.nodes[i] = .comment(comment)
+            }
+        }
+        for t in pr.extra.reviewThreads.nodes.indices {
+            for c in pr.extra.reviewThreads.nodes[t].comments.nodes.indices
+            where pr.extra.reviewThreads.nodes[t].comments.nodes[c].id == subject {
+                apply(&pr.extra.reviewThreads.nodes[t].comments.nodes[c].reactionGroups)
+            }
+        }
+        detail.value = pr
+    }
+
+    /// The viewer's reaction flipped locally, until the reload brings GitHub's count.
+    private static func toggle(_ content: String, in groups: inout [ReactionGroup], viewer: String?) {
+        guard let i = groups.firstIndex(where: { $0.content == content }) else {
+            groups.append(ReactionGroup(content: content, viewerHasReacted: true,
+                                        reactors: .init(totalCount: 1, nodes: [.init(login: viewer)])))
+            return
+        }
+        let adding = !groups[i].viewerHasReacted
+        groups[i].viewerHasReacted = adding
+        groups[i].reactors.totalCount += adding ? 1 : -1
+        if adding {
+            groups[i].reactors.nodes.insert(.init(login: viewer), at: 0)
+        } else {
+            groups[i].reactors.nodes.removeAll { $0.login == viewer }
+        }
     }
 
     private func perform(_ key: String, _ app: AppState, _ action: @escaping (GitHubClient) async throws -> Void) async -> Bool {
