@@ -96,12 +96,17 @@ enum Queries {
     }
     """
 
+    /// GitHub returns every emoji, at zero when nobody used it; the first reactors name the pill's tooltip.
+    static let reactionGroups = """
+    reactionGroups { content viewerHasReacted reactors(first: 10) { totalCount nodes { ... on Actor { login } } } }
+    """
+
     static let pullRequestDetail = """
     query($owner: String!, $name: String!, $number: Int!) {
       repository(owner: $owner, name: $name) {
         pullRequest(number: $number) {
           ...PRSummary
-          body headRefOid changedFiles mergeable mergeStateStatus viewerDidAuthor merged
+          body \(reactionGroups) headRefOid changedFiles mergeable mergeStateStatus viewerDidAuthor merged
           viewerCanUpdate viewerCanDeleteHeadRef headRef { id } headRepository { id }
           repository { nameWithOwner mergeCommitAllowed squashMergeAllowed rebaseMergeAllowed }
           reviewRequests(first: 10) {
@@ -128,7 +133,7 @@ enum Queries {
                                                  HEAD_REF_DELETED_EVENT, HEAD_REF_RESTORED_EVENT]) {
             nodes {
               __typename
-              ... on IssueComment { id author { login avatarUrl } body createdAt url }
+              ... on IssueComment { id author { login avatarUrl } body createdAt url \(reactionGroups) }
               ... on PullRequestCommit {
                 id
                 commit {

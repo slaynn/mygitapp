@@ -15,7 +15,8 @@ struct ConversationTab: View {
                                             items: pr.extra.timelineItems.nodes)
         LazyVStack(alignment: .leading, spacing: 14) {
             CommentCard(author: pr.summary.author, date: pr.summary.createdAt, url: pr.summary.url,
-                        markdown: pr.extra.body, action: "a ouvert la PR", emptyText: "Pas de description.")
+                        markdown: pr.extra.body, action: "a ouvert la PR", emptyText: "Pas de description.",
+                        reactions: pr.extra.reactionGroups ?? [])
             ForEach(timeline) { entry in
                 switch entry {
                 case .review(let group):
@@ -26,7 +27,7 @@ struct ConversationTab: View {
                     }
                 case .comment(let comment):
                     CommentCard(author: comment.author, date: comment.createdAt, url: comment.url,
-                                markdown: comment.body, action: "a commenté")
+                                markdown: comment.body, action: "a commenté", reactions: comment.reactionGroups ?? [])
                 case .commits(let commits):
                     PushedCommits(commits: commits)
                 case .event(let type, let event):
@@ -107,6 +108,7 @@ struct CommentCard: View {
     var markdown: String
     var action: String
     var emptyText: String?
+    var reactions: [ReactionGroup] = []
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -115,18 +117,52 @@ struct CommentCard: View {
                 .padding(.vertical, 9)
                 .background(Theme.raised)
             Divider()
-            Group {
+            VStack(alignment: .leading, spacing: 10) {
                 if markdown.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                     Text(emptyText ?? "").foregroundStyle(.secondary).font(.callout)
                         .frame(maxWidth: .infinity, alignment: .leading)
                 } else {
                     MarkdownBody(markdown: markdown)
                 }
+                ReactionBar(groups: reactions)
             }
             .padding(14)
         }
         .clipShape(RoundedRectangle(cornerRadius: 10))
         .card()
+    }
+}
+
+/// GitHub's reaction pills under a comment, such as the 👍 Codex leaves on the description instead of a review
+/// when it finds nothing. The viewer's own reactions are highlighted; hovering a pill names who reacted.
+struct ReactionBar: View {
+    var groups: [ReactionGroup]
+
+    var body: some View {
+        let used = groups.filter { $0.reactors.totalCount > 0 }
+        if !used.isEmpty {
+            HStack(spacing: 6) {
+                ForEach(used, id: \.content) { group in
+                    let color = group.viewerHasReacted ? Theme.blue : Theme.gray
+                    HStack(spacing: 4) {
+                        Text(group.emoji)
+                        Text("\(group.reactors.totalCount)").foregroundStyle(group.viewerHasReacted ? Theme.blue : .secondary)
+                    }
+                    .font(.system(size: 12, weight: .medium))
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 3)
+                    .background(color.opacity(0.12), in: Capsule())
+                    .overlay(Capsule().stroke(color.opacity(0.35), lineWidth: 0.5))
+                    .help(tooltip(group))
+                }
+            }
+        }
+    }
+
+    private func tooltip(_ group: ReactionGroup) -> String {
+        let logins = group.reactors.nodes.compactMap(\.login)
+        let others = group.reactors.totalCount - logins.count
+        return logins.joined(separator: ", ") + (others > 0 ? " et \(others) autre(s)" : "")
     }
 }
 
